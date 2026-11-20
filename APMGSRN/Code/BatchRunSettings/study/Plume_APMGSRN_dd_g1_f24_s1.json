@@ -1,0 +1,10 @@
+[
+  ["train.py", {
+    "save_name": "Plume_APMGSRN_dd_g1_f24_s1", "model": "APMGSRN", "ensemble": true, "ensemble_grid": "2,2,2",
+    "ensemble_ghost_cells": 0, "data": "Plume.nc", "n_features": 1, "n_grids": 8,
+    "feature_grid_shape": "24,24,24", "n_layers": 2, "nodes_per_layer": 64,
+    "precondition": false, "use_tcnn_if_available": false, "log_every": 0, "log_features_every": 0,
+    "lr": 0.01, "points_per_iteration": 32768, "iterations": 5000, "max_training_minutes": 6.0,
+    "seed": 1
+  }]
+]

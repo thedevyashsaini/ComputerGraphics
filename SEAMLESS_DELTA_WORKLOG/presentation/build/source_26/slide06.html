@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Preliminaries&nbsp;&nbsp;06</div><h1>Domain decomposition and <span class=hl>ghost cells</span></h1><div class="body">
+<div class="col" style="flex:1"><ul class="pts sm"><li>Large volumes do not fit one model or one GPU, so the paper splits the domain into n &times; n &times; n bricks</li><li>One independent APMGSRN per brick, trained in parallel</li><li>Ghost cells extend each brick into its neighbours so both models see the shared boundary</li><li>Hard router: brick index = floor((x + 1) / 2 &times; n)</li></ul></div>
+<div class="glass" style="flex:1.1;padding:34px 40px;display:flex;flex-direction:column;gap:22px">
+ <div class="label">1D VIEW OF TWO BRICKS ALONG X</div>
+ <div class="diag" style="height:330px">
+  <div class="bar" style="left:0;width:58%;top:30px;background:rgba(150,226,160,.75)">Brick A model</div>
+  <div class="bar" style="left:42%;width:58%;top:130px;background:rgba(47,168,74,.30);justify-content:flex-end">Brick B model</div>
+  <div style="position:absolute;left:42%;width:16%;top:0;bottom:60px;background:repeating-linear-gradient(45deg,rgba(60,120,70,.10) 0 12px,transparent 12px 24px);border-radius:10px"></div>
+  <div class="split" style="left:50%;bottom:60px"></div>
+  <div style="position:absolute;left:41%;top:232px;font-size:23px;color:#2c5a36">ghost-cell overlap</div>
+  <div style="position:absolute;left:51%;top:280px;font-size:23px;color:#b0473b">router split</div>
+ </div>
+ <div class="note">Each brick trains on its region plus g extra cells on every side. At query time the hard router picks exactly one brick.</div>
+</div></div></div><div class="foot"><span class="sec">Preliminaries</span><span>Seamless APMGSRN</span><span>06 / 26</span></div></div></body></html>

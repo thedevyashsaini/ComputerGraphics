@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Results&nbsp;&nbsp;16</div><h1>Experimental setup</h1><div class="body">
+<div class="col" style="flex:1"><div class="glass tcard"><table class="t">
+ <tr><th>Item</th><th>Value</th></tr>
+ <tr><td>Dataset</td><td>Plume 512 &times; 128 &times; 128</td></tr>
+ <tr><td>Decomposition</td><td>2 &times; 2 &times; 2 bricks</td></tr>
+ <tr><td>Per brick</td><td>8 grids of 24<sup>3</sup>, 2 &times; 64 decoder</td></tr>
+ <tr><td>Total parameters</td><td>923,136 (3.52 MB)</td></tr>
+ <tr><td>Training</td><td>5,000 it, 32,768 pts/it</td></tr>
+ <tr><td>Seeds</td><td>42, 1, 2</td></tr>
+</table></div></div>
+<div class="col" style="flex:1"><ul class="pts sm"><li>Same model size in every 24<sup>3</sup> condition, so only the overlap and the query rule change</li><li>Ghost cells named by actual overlap: g1, g4, g16</li><li>Larger g16 models at 27<sup>3</sup> and 32<sup>3</sup> to test whether more capacity closes the gap</li><li>Total GPU time about 2 h 10 min on the RTX 3050</li></ul></div></div></div><div class="foot"><span class="sec">Results</span><span>Seamless APMGSRN</span><span>16 / 31</span></div></div></body></html>

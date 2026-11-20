@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Preliminaries&nbsp;&nbsp;07</div><h1>Quality metrics used in this work</h1><div class="body">
+<div class="col" style="flex:1">
+ <div class="glass tint mathbox"><div class="label">PSNR</div><div class="math" style="font-size:32px">PSNR = 20 log<sub>10</sub>(range) &minus; 10 log<sub>10</sub>(MSE)</div>
+ <div class="note">Global over all voxels. Boundary over a 2-cell band around every split. Interior over the rest.</div></div>
+ <div class="glass mathbox"><div class="label">SSIM</div><div class="note">Structural similarity of rendered images. It compares local mean, contrast and structure, so it tracks perceived quality better than pixel error.</div></div>
+</div>
+<div class="col" style="flex:1">
+ <div class="glass tint mathbox"><div class="label">VALUE JUMP</div><div class="math" style="font-size:32px">J<sub>v</sub> = mean | f<sub>A</sub>(x<sup>&minus;</sup>) &minus; f<sub>B</sub>(x<sup>+</sup>) |</div>
+ <div class="note">Measured on both sides of each interface, normalised by data range.</div></div>
+ <div class="glass tint mathbox"><div class="label">GRADIENT JUMP</div><div class="math" style="font-size:32px">J<sub>g</sub> = mean | &part;<sub>n</sub>f<sup>&minus;</sup> &minus; &part;<sub>n</sub>f<sup>+</sup> |</div>
+ <div class="note">Normal-derivative mismatch. Ground truth has a floor of 1.75e-3, since real data also varies there.</div></div>
+</div></div></div><div class="foot"><span class="sec">Preliminaries</span><span>Seamless APMGSRN</span><span>07 / 26</span></div></div></body></html>

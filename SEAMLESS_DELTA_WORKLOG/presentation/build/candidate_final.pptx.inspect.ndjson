@@ -1,0 +1,101 @@
+{"kind":"deck","id":"pr/la8m6t","name":"Deck"}
+{"kind":"layout","id":"ly/gny18r69","editable":false,"name":"Master","type":"master"}
+{"kind":"layout","id":"ly/ovu9szu1","editable":false,"name":"Title Slide","type":"title","placeholders":[{"name":"title","type":"title"},{"name":"subtitle","type":"subtitle"}]}
+{"kind":"layout","id":"ly/i1kr6xgf","editable":false,"name":"Section Header","type":"sectionHeader","placeholders":[{"name":"title","type":"title"}]}
+{"kind":"layout","id":"ly/w7a1c721","editable":false,"name":"Title and Body","type":"tx","placeholders":[{"name":"title","type":"title"},{"name":"body","type":"body"}]}
+{"kind":"layout","id":"ly/bqhgnu10","editable":false,"name":"Title and Two Column","type":"twoColTx","placeholders":[{"name":"title","type":"title"},{"name":"Left column","type":"body"},{"name":"Right column","type":"body"}]}
+{"kind":"layout","id":"ly/cvuhkf29","editable":false,"name":"Title and One Column","type":"tx","placeholders":[{"name":"title","type":"title"},{"name":"body","type":"body"}]}
+{"kind":"layout","id":"ly/edczilwn","editable":false,"name":"Blank","type":"blank"}
+{"kind":"slide","id":"sl/cn6vv3","slideIndex":0,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 1","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/pk36hofu","slideIndex":0,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/cn6vv3","slideIndex":0,"text":"Introduce the project in one sentence: we take a neural volume compressor that splits big data into bricks, and we remove the visible seams between bricks while using fewer overlap cells. Image on the right is the Plume ground-truth volume rendering from our own renderer. Base paper citation: Wurster et al., IEEE TVCG 30(1) 2024, arXiv 2308.02494. Plan for 30 minutes: preliminaries 8 min, problem 4 min, implementation 8 min, results 7 min, extensions 3 min."}
+{"kind":"slide","id":"sl/uukrzj","slideIndex":1,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 2","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/2hkfi1kr","slideIndex":1,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/uukrzj","slideIndex":1,"text":"Syllabus link: volume rendering integral and its discrete compositing form. Emphasise the last point because the whole project is about small discontinuities that the transfer function makes visible. Our renderer uses 768 samples per ray at 512 by 256 pixels."}
+{"kind":"slide","id":"sl/q9k4gw","slideIndex":2,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 3","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/ips7udsb","slideIndex":2,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/q9k4gw","slideIndex":2,"text":"Also called scene representation networks or coordinate networks. The compression number is our own: 512x128x128 float32 is 32 MiB and the model is 923,136 float32 parameters, 3.52 MiB."}
+{"kind":"slide","id":"sl/xwoiol","slideIndex":3,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 4","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/9gruxgny","slideIndex":3,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/xwoiol","slideIndex":3,"text":"Figure from the base paper comparing the three encoders. Key idea for the exam: the grid holds most of the parameters, the decoder is tiny. In our model the decoders are only about 4 percent of the parameters, which matters later for the fine-tune."}
+{"kind":"slide","id":"sl/lf863h","slideIndex":4,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 5","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/adsjylgb","slideIndex":4,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/lf863h","slideIndex":4,"text":"Architecture figure from Wurster et al. 2024. The power 20 makes the Gaussian flat-topped, so it acts like a soft box marking where the grid sits. Teaser figure in the paper shows grids migrating onto features in Asteroid, Plume, Supernova and Nyx."}
+{"kind":"slide","id":"sl/2icl6n","slideIndex":5,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 6","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/9s3epsrq","slideIndex":5,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/2icl6n","slideIndex":5,"text":"Syllabus link: domain decomposition is the standard way to scale volume compression and rendering. The router picks one brick per point, so at the split line the field switches abruptly from model A to model B. In the code the config value plus one equals the actual overlap, so our g1, g4 and g16 names count real cells."}
+{"kind":"slide","id":"sl/dxsalr","slideIndex":6,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 7","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/10zapkji","slideIndex":6,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/dxsalr","slideIndex":6,"text":"Global PSNR alone hides seams because the boundary band is a tiny fraction of voxels. That is why we added boundary PSNR and the two jump metrics. Render metrics come from our own ray marcher at 512 by 256 with 768 samples per ray, since nerfacc and tcnn were unavailable on this machine."}
+{"kind":"slide","id":"sl/p7alfj","slideIndex":7,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 8","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/z6pkvelk","slideIndex":7,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/p7alfj","slideIndex":7,"text":"Figure from the base paper. Note the irony: the seam-free version has the lower PSNR. 16 ghost cells on a 256 cubed brick means each model fits 288 cubed, 42 percent more voxels with the same parameters."}
+{"kind":"slide","id":"sl/61ggem","slideIndex":8,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 9","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/wri5sja1","slideIndex":8,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/61ggem","slideIndex":8,"text":"State this slowly. Everything after this slide either builds the method or checks it against this goal."}
+{"kind":"slide","id":"sl/in1ikr","slideIndex":9,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 10","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/3ml8j6p4","slideIndex":9,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/in1ikr","slideIndex":9,"text":"Keep this short, about one minute. This establishes that the base implementation and qualitative ghost-cell behaviour were reproduced locally. Teaser figure from the base paper."}
+{"kind":"slide","id":"sl/uhd6eb","slideIndex":10,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 11","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/n2lcnad8","slideIndex":10,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/uhd6eb","slideIndex":10,"text":"This answers the paper's future-work item. Blending is the communication between bricks at inference time, the fine-tune is communication at training time."}
+{"kind":"slide","id":"sl/jxu24h","slideIndex":11,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 12","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/s72tozmx","slideIndex":11,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/jxu24h","slideIndex":11,"text":"Smoothstep is the same function used in shader programming, so it is a natural fit for a graphics course. Symmetry S(t)+S(1-t)=1 is the key property: it gives a partition of unity. The 3D weight is a tensor product, which is why edges and corners automatically mix 4 and 8 bricks. Division by the sum makes it robust at the domain border."}
+{"kind":"slide","id":"sl/g2su66","slideIndex":12,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 13","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/ojaxcrex","slideIndex":12,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/g2su66","slideIndex":12,"text":"Normal gradients come from autograd on the input coordinates. We also ran a control with the same schedule but only L_rec, called recon fine-tune. That control turns out important on the ablation slide."}
+{"kind":"slide","id":"sl/d7kw9j","slideIndex":13,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 14","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/jutg7u5c","slideIndex":13,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/d7kw9j","slideIndex":13,"text":"Work lives on branch seamless-apmgsrn with an isolated worklog. The slice shows why boundary metrics matter: the error lines up with the splits."}
+{"kind":"slide","id":"sl/r24bzn","slideIndex":14,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 15","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/p8fitof2","slideIndex":14,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/r24bzn","slideIndex":14,"text":"The error map makes the brick boundaries visible as straight lines."}
+{"kind":"slide","id":"sl/a6bz73","slideIndex":15,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 16","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/ozytgvqp","slideIndex":15,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/a6bz73","slideIndex":15,"text":"The repo config counts ghost cells one lower than the actual overlap, so config 3 gives g4 and config 15 gives g16. The paper's recommended setting is g16."}
+{"kind":"slide","id":"sl/uujqyx","slideIndex":16,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 17","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/1s7ydkfa","slideIndex":16,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/uujqyx","slideIndex":16,"text":"Paired over seeds 42, 1 and 2: ours wins on every metric on every seed. Ours here means g4 overlap plus consistency fine-tune plus blending."}
+{"kind":"slide","id":"sl/2ti7i0","slideIndex":17,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 18","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/upsnm50r","slideIndex":17,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/2ti7i0","slideIndex":17,"text":"Use this view when discussing the four headline metrics."}
+{"kind":"slide","id":"sl/pqzbfe","slideIndex":18,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 19","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/dormxczi","slideIndex":18,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/pqzbfe","slideIndex":18,"text":"Read the table top to bottom: the paper setting is the worst 24 cubed row. Blending alone already brings the value jump down by more than two orders of magnitude. The best row is recon fine-tune plus blend at 50.98 dB. Throughput is median of 7 rounds."}
+{"kind":"slide","id":"sl/9r97jb","slideIndex":19,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 20","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/mdobehsj","slideIndex":19,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/9r97jb","slideIndex":19,"text":"Seeds won means our method was better on that metric for that seed. Render PSNR gain vs g16 hard is +2.08 dB, gradient jump is 1.38 times lower, also 3 of 3 seeds."}
+{"kind":"slide","id":"sl/2m3rqn","slideIndex":20,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 21","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/ilsjuh4v","slideIndex":20,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/2m3rqn","slideIndex":20,"text":"Point at the seam streak in the g16 error image. The consistency fine-tune variant scores 43.16 dB and 0.9918 on the same seed. Renders from our own ray marcher at 512 by 256 with 768 samples per ray."}
+{"kind":"slide","id":"sl/do0spl","slideIndex":21,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 22","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/n2lcbuhw","slideIndex":21,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/do0spl","slideIndex":21,"text":"The capacity runs are single seed, so present them as indicative. Be upfront that the biggest g16 model slightly wins render PSNR against the consistency variant."}
+{"kind":"slide","id":"sl/9bridv","slideIndex":22,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 23","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/3ytcfa9k","slideIndex":22,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/9bridv","slideIndex":22,"text":"The paper setting needs 2.3 times more parameters to match global PSNR."}
+{"kind":"slide","id":"sl/5jx49q","slideIndex":23,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 24","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/wr2pszq1","slideIndex":23,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/5jx49q","slideIndex":23,"text":"g1 is a single seed. We chose g4 because the blend needs room for a smooth ramp, and g1 gives only one cell. g2 remains untested because the GPU budget ran out."}
+{"kind":"slide","id":"sl/sp9npm","slideIndex":24,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 25","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/ydgbmtor","slideIndex":24,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/sp9npm","slideIndex":24,"text":"Wide hard-routed overlap lowers PSNR while the seam remains."}
+{"kind":"slide","id":"sl/37gsem","slideIndex":25,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 26","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/tkzqx0bi","slideIndex":25,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/37gsem","slideIndex":25,"text":"Say this directly, it builds trust. We planned the consistency loss as the main idea and the control showed it adds little once blending is in place."}
+{"kind":"slide","id":"sl/wg4d8j","slideIndex":26,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 27","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/vip0jqx8","slideIndex":26,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/wg4d8j","slideIndex":26,"text":"Throughput is the median of 7 rounds. The slowdown comes from evaluating several bricks for points inside the overlap. A fused CUDA kernel is listed as an extension."}
+{"kind":"slide","id":"sl/1e3ker","slideIndex":27,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 28","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/y98b254r","slideIndex":27,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/1e3ker","slideIndex":27,"text":"The three panels compare throughput, frame time and GPU memory."}
+{"kind":"slide","id":"sl/pajj0l","slideIndex":28,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 29","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/mtgf6tof","slideIndex":28,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/pajj0l","slideIndex":28,"text":"The first three are mainly compute; each needs well under an hour of GPU time. The last five are engineering extensions."}
+{"kind":"slide","id":"sl/juvf0f","slideIndex":29,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 30","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/u5wfi5wf","slideIndex":29,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/juvf0f","slideIndex":29,"text":"Gradient jump of ours is 2.12e-3 against a ground-truth floor of 1.75e-3, so most of the remaining gradient jump reflects real data variation."}
+{"kind":"slide","id":"sl/aai5qf","slideIndex":30,"layout":{"id":"ly/edczilwn","name":"Blank"},"title":"Slide 31","textShapes":0,"backgroundColor":"rgba(255,255,255,1)"}
+{"kind":"image","id":"im/ul07mdoj","slideIndex":30,"position":{"left":0,"top":0,"width":1280,"height":720},"fit":"cover","name":""}
+{"kind":"notes","id":"nt/aai5qf","slideIndex":30,"text":"Close by restating the goal from the problem slide and that it was met: 4 ghost cells, same 923k parameters, +2 dB, seams gone. Base paper: Wurster, Xiong, Shen, Guo, Peterka, IEEE TVCG 30(1) 2024, arXiv 2308.02494."}

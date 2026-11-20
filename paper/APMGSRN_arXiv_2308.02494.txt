@@ -1,0 +1,943 @@
+===== PAGE 1 =====
+Adaptively Placed Multi-Grid Scene Representation Networks
+for Large-Scale Data Visualization
+SkylarW.Wurster ,TianyuXiong,Han-WeiShen,HanqiGuo,andTomPeterka
+Abstract—Scenerepresentationnetworks(SRNs)havebeenrecentlyproposedforcompressionandvisualizationofscientificdata.
+However,state-of-the-artSRNsdonotadapttheallocationofavailablenetworkparameterstothecomplexfeaturesfoundinscientific
+data,leadingtoalossinreconstructionquality.Weaddressthisshortcomingwithanadaptivelyplacedmulti-gridSRN(APMGSRN)
+andproposeadomaindecompositiontrainingandinferencetechniqueforacceleratedparalleltrainingonmulti-GPUsystems.We
+alsoreleaseanopen-sourceneuralvolumerenderingapplicationthatallowsplug-and-playrenderingwithanyPyTorch-basedSRN.
+OurproposedAPMGSRNarchitectureusesmultiplespatiallyadaptivefeaturegridsthatlearnwheretobeplacedwithinthedomain
+todynamicallyallocatemoreneuralnetworkresourceswhereerrorishighinthevolume,improvingstate-of-the-artreconstruction
+accuracyofSRNsforscientificdatawithoutrequiringexpensiveoctreerefining,pruning,andtraversallikepreviousadaptivemodels.In
+ourdomaindecompositionapproachforrepresentinglarge-scaledata,wetrainansetofAPMGSRNsinparallelonseparatebricks
+ofthevolumetoreducetrainingtimewhileavoidingoverheadnecessaryforanout-of-coresolutionforvolumestoolargetofitin
+GPUmemory.Aftertraining,thelightweightSRNsareusedforrealtimeneuralvolumerenderinginouropen-sourcerenderer,where
+arbitraryviewanglesandtransferfunctionscanbeexplored.Acopyofthispaper,allcode,allmodelsusedinourexperiments,andall
+supplementalmaterialsandvideosareavailableathttps://github.com/skywolf829/APMGSRN.
+IndexTerms—Scenerepresentationnetwork,deeplearning,scientificvisualization,volumerendering
+1 INTRODUCTION
+Scenerepresentationnetworks(SRNs)arecompactneuralnetworks astheadaptivedatamodelinournetwork,APMGSRNusesasetof
+thatmapinputcoordinatestooutputscalarfieldvalues[15,18,23–25]. spatiallyadaptivefeaturegrids,showninFigure1,whoseextentsare
+SRNs use a small footprint on disk (data reduction between 10− defined by learned transformation matrices which transform global
+10000×)whilebeingefficienttoevaluatewithrandomaccess. With spaceintolocalfeaturespace, wherethegridisdefinedastheunit
+these benefits, SRNs have been used for compression [16,30] and cube[−1,1]3. Toguidethegridstocoverspatialregionswherethe
+volumerendering[30,32]forscientificdatauptosizesof1TB. modelhasrelativelyhighererror,wedevelopacustomfeaturedensity
+DespiteSRNs’popularity,therearetwoshortcomingsofcurrent loss,thatcalculatestherelativeentropyfromthecurrentfeaturegrid
+state-of-the-artSRNsforscientificdatavisualization.First,theSRNar- density to a target feature density, where the assumption is higher
+chitecturesusedinrecentapproachesarenotdesignedtoadaptnetwork featuredensityimprovesreconstruction(shownbyotherfeaturegrid
+resources to more important regions, and make the inherit assump- networks[3,25,30,33]).Thisaloneisnotenoughtotrainthefeature
+tionthatthevolumeitwillrepresenthasuniformcomplexity,leading gridsthough,asthedensityofagridisastepfunctionthathasagradient
+toinefficientuseofthenetworkparametersinhomogeneousregions of0everywhere.Therefore,weapproximatethefeaturedensitywith
+and limiting model performance. Recently proposed SRN models adifferentiablefunctionthatcloselymatchesthestepfunctioncalled
+haveincorporatedadaptiveparameterallocationwithspatiallyadaptive a flat-top gaussian. We also develop a specific training routine for
+quadtreesandoctreesthatrefineonthescene’sgeometryorfeatures, thefeaturegrid’stransformationmatriceswithdelayedstartandearly
+buttheseapproachesrequiresignificantextrastorageandcomputation stoppingtoimproveaccuracyandconvergequicker.Ouradaptivegrid
+tostoreandsearchthetreestructureduringtraining[15,17,25,33], architecturedoesnotrequireexpensivetreesearchingorpruninglike
+takinghoursordaystofitonimageswithfewerdegreesoffreedom otheradaptivemodels,anddynamicallyallocatesmoreneuralnetwork
+thanmost3Dscientificdata.Inadditiontothis,thetreestructureitself resourcestoregionsofhighererrorforanyvolume,improvingstate-of-
+isnotdirectlylearnable,sothetreesareupdatedeverysetnumberof the-artSRNperformancebyusingnetworkparametersefficiently.
+iterationswithanad-hocmethodwhiletraining. Thetreestructure UsingourAPMGSRNarchitectureasabuildingblock,wedevelopa
+alsoscalespoorlywithdimensionality, increasingstorageandcom- domaindecompositiontrainingstrategythatfitsalarge-scalevolumein
+putationrequirementsexponentiallyasthenumberofdimensionsor amodel-parallelfashion.Ourdomaindecompositiontrainingapproach
+treedepthincreases.Second,existingtrainingroutinesforlarge-scale dividesdatainthevolumeonagridofbricks, andtrainsoneSRN
+dataareproposedforasingleGPUwithout-of-coresamplestream- perblockofdata. TheblocksofdatafitinGPUmemory, sothere
+ing[32],whichintroducesI/Ooverheadanddoesnottakeadvantage arenoinefficienciesfromanout-of-coredatasamplingmethod. We
+ofthemultipleGPUsoftenavailableonasinglecomputenodefrom also assume that the large-scale data being fit are often generated
+thesupercomputersgeneratingthelarge-scaledata. bymachinesequippedwithmultipleGPUspernode, soweuseall
+Inthiswork,weaddressthetwolimitationsmentionedabovewith availableGPUstotrainmultiplenetworksinparallel,reducingtotal
+anovelSRNmodelanddomaindecompositiontrainingroutinefor trainingtime.Inferenceinthissetofmodelsismorecomplicatednow,
+fittinglarge-scaledata.First,weaddressthelackofadaptivityinstate- since a search is necessary to find which model was trained on the
+of-the-artSRNsforscientificdatawithanovelSRNarchitecturecalled spatialdomainforeachpointbeingqueried. Toaccelerateinference
+adaptivelyplacedmulti-gridSRN(APMGSRN).Insteadofusingtrees inadomaindecompositionmodel,weuseahashfunctionthatmaps
+spatialcoordinatestothehashtableentriesforthecorrectmodeltouse
+forinferenceinparallel. Notonlydodomaindecompositionmodels
+• SkylarWWursteriswithTheOhioStateUniversity.E-mail: allowfittinga450GBvolumeinunder7minuteson8GPUs,butthey
+wurster.18@osu.edu alsoincreasereconstructionaccuracyoverasinglemodelatthesame
+Manuscriptreceivedxxxxx.201x;acceptedxxxxx.201x.DateofPublication numberoftotalmodelparameters.
+xxxxx.201x;dateofcurrentversionxxxxx.201x.Forinformationon Insummary,ourcontributionsaretwofold:
+obtainingreprintsofthisarticle,pleasesende-mailto:reprints@ieee.org.
+DigitalObjectIdentifier:xx.xxxx/TVCG.201x.xxxxxxx • AnovelSRNarchitecturecalledadaptivelyplacedmulti-gridSRN
+(APMGSRN)withadaptivefeaturegridsthatlocalizetrainable
+4202
+rpA
+6
+]VI.ssee[
+3v49420.8032:viXra
+
+===== PAGE 2 =====
+Fig.1:Examplesofouradaptivelyplacedfeaturegridsfittingtovolumesduringtraining.Thefeaturegridsfindvolume-specificregionstocover
+tomaximizereconstructionaccuracy.Videoofevolutionofgridsduringtrainingavailableinsupplementalmaterials.
+network parameters on regions of the volume with high error
+duringtraining
+• A domain decomposition training and inference strategy that
+trainsmultipleSRNsinparallelforfittinglarge-scaledataquicker
+oncapablemachines
+OurAPMGSRNarchitectureanddomaindecompositionmodelling
+technique are evaluated on several scientific datasets ranging from
+volumes of size 1282×512 (32MB to store) up to 10240×1536×
+7680(450GBtostore).Wecomparethereconstructionqualityofour
+proposed APMGSRN architecture (single model, not decomposed)
+withotherstate-of-the-artmodels,anddemonstratethatouradaptive
+feature grids improve reconstruction quality over state-of-the-art at Fig.2:ComparisonofourAPMGSRNwithotherstate-of-the-artmod-
+similarmodelsizes.Wefurtherevaluatetheperformanceofourdomain elsfVSRN[30]andNGP[20].The⊕operatorrepresentsconcatena-
+decompositionstrategybyfittingtwodatasetsthatare250GBand450 tion.
+GB.Lastly,weevaluatetherenderingperformanceofourproposed
+NeRFbyexploitingthatthegradientofaSIRENnetworkisanother
+modelcomparedwithotherstate-of-the-artSRNsinouropen-source
+SIRENnetworkthatsharesthesameweightsastheoriginalnetwork.
+renderer,whichwereleasewithourcodetoofferaneasytouse,plug-
+Thenthe“gradient”networkcanbetrainedasaNeRF,resultinginthe
+and-play,neuralvolumerendererforINRstrainedonscientificdata.We
+original“integral”networklearningtheintegrationofcolorsanddensity
+provideallcodeforourmodel,training,andneuralvolumerendereron
+throughraysinspace. Luetal.[16]useaSIREN-basedarchitecture
+GitHub:https://github.com/skywolf829/APMGSRN,alongwith
+withresidualconnectionstomodel3Dvolumetricdatainacompressed
+installationinstructionsandsupplementalvideos.
+format.Höhleinetal.[7]studythecapabilitiesofINRsforcompressing
+meteorlogicalensembledata. HanandWang[6]proposeCoordNet,
+2 RELATEDWORKS
+asingleimplicitmodelbasedontheresidualsirenarchitectureofLu
+Asourmethodisprimarilyrelatedtoscenerepresentationnetworks, etal.[16]thatisusedforspatiotemporalsuperresolutionandnovel
+wereviewrelatedliteraturecoveringSRNarchitecturesandtraining, viewsynthesis. Tanciketal.[26]proposeBlock-NeRF,whichuses
+examiningapplicationsinthecomputervisionandsci-visdomains. multipleNERFmodelsrepresentingdisjointsubsectionsofblocksofa
+OurworkispartofalargerdomainofresearchcalledDL4SciVis,for regionofSanFrancisco. Thisissimilartoourapproach,butmodels
+whichWangandHanprovideacomprehensivesurvey[29]. representgeometry(learnedfromimages)withinaspecifiedradius
+fromthemodel’scenterwithlargeoverlapwithothermodels,while
+2.1 Scenerepresentationnetworks ourapproachdividesthedomainwithrectangularbricksasitfitsthe
+Scenerepresentationnetworks, alsocalledimplicitneuralrepresen- voxelgridrepresentationbetter.
+tations (INRs) or coordinate networks, are networks that encode a Grid-basedencodingSRNs.IncontrasttofullyconnectedSRNs,
+givenscenewiththeweightsoftheneuralnetwork,suchthatinput grid-basedencodingSRNsmovealargemajorityofthenetworkpa-
+coordinatesaremappedtooutputvalues. Inthecontextofcomputer rameters to an efficient encoding scheme that transforms the input
+vision,SRNscanlearntorepresentimages[17,24],signeddistance coordinatestoahigh-dimensionalfeaturespace.SRNswithgrid-based
+functions[17,24],orradiancefields[18,23,33].Inthecontextofsci- encoding schemes train and infer faster than their fully connected
+entificdataandvisualization,SRNshavebeenusedtomodel3Dscalar counterpartsduetotheefficientencodingandlimitedfullyconnected
+fieldsandtime-varyingscalarfields[16,30,32].Webroadlyclassify operations.Weissetal.[30]createfVSRN,anSRNthatmodels3Dsci-
+thearchitectureofSRNmodelsintotwocategories: fullyconnected entificdatausingafeature-gridencoderwhichplacesalow-resolution
+andgrid-basedencoding. featuregridoverthedatadomainandinterpolateswithinthefeature
+Fully connected SRNs. Fully connected SRNs use only linear grid to obtain a feature vector for decoding. Yu et al. [33] acceler-
+layerswithactivationsbetweenthemtomapaninputcoordinateto ateapre-trainedNeRFmodelwithsphericalharmonicsandanoctree
+output value, making them slow to train and perform inference on. datastructureforempty-spaceskipping,enablingrealtimerenderingof
+SIREN[24]isafullyconnectedSRNwithsinusoidalactivationstofit NeRFmodels.Liuetal.[15]proposeneuralsparsevoxelfields,which
+dataaccurately.FourierfeaturesbyTanciketal.[27]showsthatFourier usesacoarse3Dgridofvoxelsthatareprunedandsplitatcheckpoints
+encodingofinputcoordinatescanhelpINRaccuracy.NeRF[18]isa during training to reduce the training time of NeRF with improved
+fullyconnectedSRNformodellingaradiancefieldfrommulti-view accuracy.Genovaetal.[4]learnanimplicitrepresentationofamesh
+images of a scene. AutoInt [14] builds on NeRF by requiring far fromdepthimagesusingadensegridandmanylocaldeepimplicit
+lessmodelinferencesduringneuralvolumerenderingcomparedto functions.Takikawaetal.[25]proposeNGLOD,whichlearnsanoctree
+
+===== PAGE 3 =====
+Fig.3:AnoverviewoftheAPMGSRNarchitecture.In(1),aquerycoordinateistransformedintoeachoftheMgrid’slocalcoordinatesystems
+learnedbythetransformationmatrices,wheregridlocalextentsareassumedtobe[−1,1]3. (2),thelocalcoordinatesareusedtotrilinearly
+interpolatewithineachfeaturegrid(ofresolutionD×H×W)toobtainthecorrespondingfeatureforeachgrid.Ifthecoordinateisoutofbounds,
+zerosarereturnedinstead. TheresultingM·Cfeaturesareconcatenatedintoafeaturevector. Steps(1)and(2)areconsideredtheencoding
+process.Instep(3),thefeaturevectorisdecodedinashallowMLPforthefinaloutputvalue f(x).
+datastructureforrealtimerenderingofanSRNfittingasigned-distance adaptiveallocationofnetworkresourcesforspecificregions[15,17,33],
+function.Marteletal.[17]createanadaptivecoordinatenetworkthat but the approaches are ad-hoc, require hours to days to train, and
+usesquadtrees/octreesduringtraining,updatedbysolvinganinteger havesignificanttraining/storageoverheadtomanagethetreestructure.
+linearprogrammingoptimizationproblemeverysetnumberofitera- Additionally,thecostofthetreestructuresscaleexponentiallyasthe
+tions. Chenetal.[3]usetensor(de)compositiontoreducethespace numberofdimensionsortreedepthincreases.
+complexityof3DfeaturegridswiththeirVMdecompositionofaten- OurmethodimprovesadaptivitywithinSRNswithanoveladap-
+sor.Mülleretal.[20]introducehashgridencodingforneuralgraphics tivelyplacedmulti-gridscenerepresentationnetwork(APMGSRN),
+primitives(NGP),whichusesrandomhashingtomapinputcoordinates depictedinFigure3. Insteadofatreestructure,APMGSRNusesa
+tofeaturesinahashtableatmultiplelevelsofdetail. Wuetal.[32] set of multiple spatially adaptive feature grids (shown in Figure 1),
+usethehashgridarchitecture[20]tomodelscientificdataupto1TBin eachdescribedbyalearnabletransformationmatrix,forcoordinate
+size.ConcurrentworkbyWuetal.[31]usesameta-learningapproach encoding before being decoded by a shallow MLP, as described in
+thatpredictsthenetworkweightsofasetofmodelsofthehashgrid Section4.1.Sinceabasicreconstructionlossisnotenoughtolearnthe
+architecture[20]fornovelviewsynthesisandneuralvolumerendering transformationmatricesproperly,Section4.2describesourmethodto
+oftemporallyinterpolatedvolumesanddynamicglobalshadows. learngridpositionswithafeaturedensity-basedlossfunction.Finally,
+ExistingadaptivemodelssuchasACORN[17],NSVF[15],and wediscussthenetworktraininginSection4.3.Ourmodelgivesstrong
+NGLOD[25]areexpensivetotrain,store,andrequiread-hocstepsfor reconstructionqualityevenwithfewmodelparametersthankstothe
+pruning/refiningthetreedatastructure. Additionally,thetree-based abilitytotransformthefeaturegridstofitthecomplexitiesinthedata.
+adaptivityonlyhelpsforsceneswithstaticsurfaces.Volumetricscien- Sinceourmodeldoesnotrelyonatreestructure,inferenceremains
+tificdatadonotgenerallyhavestaticsurfaces,sincedifferentsurfaces quickandstoragecostsremainlow.
+arisefromvisualizingdifferentisovalues.Thus,thespace-skippingand
+treestructuresusedbyothermethodsignorerelevantregionsofthe 4.1 APMGSRNarchitecture
+scientificdata. Ourapproach’sadaptivefeaturegridsdonotrequire AnAPMGSRNisafunction f(x)thatmapsnormalizedspatialcoor-
+surfacestorefineto,andisdrivenonlybyreconstructionerror. AP- dinatesx∈[−1,1]3 tothescalarvalueatthatlocationinspace. The
+MGSRNisconceptuallyanadaptiveversionoffVSRNthatsplitsthe modelarchitectureiscomposedofanencodereanddecoderd such
+singlehighly-parameterizedfeaturegridintomanyless-parameterized that f(x)=d(e(x)),depictedinFigure2andFigure3. Ourencoder,
+feature grids, where each feature grid now has the ability to adjust describedinSection4.1.1,isouradaptivelyplacedmulti-gridencoder,
+itstransformationwithinthedomaintofocusonhigh-errorregions. andourdecoder,describedinSection4.1.2,isasmallfully-connected
+A visual comparison of our model and two state-of-the-art models MLPthatdecodestheencodedfeaturevectortoanoutputvalue.
+comparedwithinthispaper,fVSRNandNGP,isprovidedinFigure2.
+4.1.1 Adaptivelyplacedmulti-gridencoder
+3 OVERVIEW
+TheencoderinAPMGSRNcontainsMlearnablefeaturegridsofres-
+Ourapproachiscomposedoftwocomponents:(1)anovelSRNarchi- olutionD×H×W withCchannels,representedasatensorF with
+tecturecalledAPMGSRN,and(2)adomaindecompositiontraining shape[M,C,D,H,W].
+andinferencemethodtotrainonlarge-scaledata. Insection4, we Transformationtolocalspace. Inourmodel,thespatialextents
+detailtheAPMGSRNarchitecture,aSRNmodelthatadaptivelylearns ofthei-thfeaturegridisdefinedbya4×4transformationmatrixG i,
+wheremultiplefeaturegridsshouldbespatiallylocatedwhiletraining. whichtransformsglobal-spacecoordinatestolocal-spacecoordinates
+Insection5,weexplainthedomaindecompositionapproach,which accordingtothefollowing:
+dissectsavolumeintoa3Dgridofnetworksthatareeachtrainedon
+theirownlocalregion.  pl x  G i,0,0 G i,0,1 G i,0,2 G i,0,3 pg x 
+4 ADAPTIVELYPLACEDMULTI-GRIDSCENEREPRESENTATION    p p l y l z    =  G G i i , , 1 2 , , 0 0 G G i i , , 1 2 , , 1 1 G G i i , , 1 2 , , 2 2 G G i i , , 1 2 , , 3 3     p p g y g z   , (1)
+NETWORK 1 0 0 0 1 1
+Recentstate-of-the-artSRNshavefoundthatusingexplicitlydefined
+featuregridswithinthemodelreducestrainingandinferencetimes[3, where G i,r,c is the r-th row and c-th column of the transformation
+20,30].Inthesefeaturegrid-basedmodels,afeaturegridisinterpolated matrix,pg x,pg y,pg z istheglobalcoordinate,andpl x ,pl y ,pl z istheresulting
+ataninputspatialcoordinatetoretrieveafeaturevector,whichisfed local coordinate. Conceptually, the first 3 rows and columns of G i
+through a shallow multi-layer perceptron (MLP) to obtain the final areresponsibleforscale,rotation,andshearingofthegrid,whilethe
+outputvalue.TreestructureshavebeenaddedtoSRNmodelstosupport 4thcolumnisresponsiblefortranslation.Thegrid’slocalextentsare
+
+===== PAGE 4 =====
+assumedtobe[−1,1]3,andglobalcoordinatesforthe8cornersofagrid howwederiveatargetfeaturedensitythatwarpsthecurrentfeature
+canbedeterminedbycalculatingtheinverseofG iandtransforming densitytoincreasewheretheerrorisrelativelyhigheranddecrease
+thecoordinatesofthelocalextentstoglobalspace.Forshorthand,we whereerrorisrelativelylower,andalossfunctiontoquantifytheerror
+considerG i (xg)tobeafunctionmappinga3Dglobalcoordinatexgto betweenthecurrentandtargetfeaturedensitywhichisultimatelyused
+thecoordinateingridi’slocalspaceaccordingtoEquation1. toupdatethetransformationmatricesduringtraining.
+Encoding.Toencodeaninputglobalcoordinate,thecoordinateis Featuredensity. Thesimplestwaytorepresentfeaturedensityis
+transformedintoeachgrid’slocalcoordinatesystemviathedefining bythenumberofgridsthatoverlapaspatialpositionx. Thefeature
+transformationmatrices.Then,each3Dlocalcoordinatex
+l
+isusedto densityρatagloballocationxusingthisformulationcanbedescribed
+performtrilinearinterpolationwithineachfeaturegrid: bythefollowingequation:
+(cid:40) (cid:40)
+e i (x l )= i 0, nterp(F i ,x l ) o if th − er 1 w ≤ ise x l ≤1 (2) ρ(x)= M ∑ −1 1 0, o if th − er 1 w ≤ ise G i (x)≤1 , (4)
+i=0
+whereF iisthefeaturegridforthei-thgridandinterp(F i ,x l )performs whereG i (x)isthefunctionthattransformsglobalcoordinatexinto
+trilinearinterpolationwithinF iatpointx
+l
+assumingthegridhasvertices featuregridi’slocalcoordinateframe.Theifstatementistruewhenit
+corner-alignedattheextentsof[−1,1]3. Whentheinputcoordinate holdsforeachofthethreedimensionsofG i (x).However,thisapproach
+isnotwithinthefeaturegrid,thefeaturereturnedis0foreachofthe doesnotaccuratelyrepresentthedensityoffeaturesatthatpoint.Each
+expectedCchannels.Theencodingstepforasinglegridasdescribed feature grid has the same resolution, but a feature grid with small
+inEquation2isperformedforeachgrid, withresultsconcatenated extents will have more dense features thana feature grid withnear
+together.Fromglobalspace,theencodingiscalculatedas: globalextents.Instead,abetterfeaturegridformulationis:
+(cid:40)
+e(xg)=e 0 (G 0 (xg))⊕e 1 (G 1 (xg))⊕...⊕e M−1 (G M−1 (xg)) (3) ρ(x)= M ∑ −1 det(G i,0:3,0:3 ) if −1≤G i (x)≤1 , (5)
+0, otherwise
+where⊕istheconcatenationoperator. Theresultisafeaturevector i=0
+y
+M
+=
+is
+e
+t
+(
+h
+x
+e
+g)
+nu
+w
+m
+it
+b
+h
+e
+C
+ro
+·M
+fgr
+f
+i
+e
+d
+a
+s
+t
+.
+ures,whereCisthenumberofchannelsand
+whereG i,0:3,0:3 isthetop-left3×3matrixofG i representingscale,
+shear,androtationforthegrid,anddet(·)isthedeterminantofamatrix.
+4.1.2 Decoding Asthegridbecomesmoredense(smallerintheglobaldomain),the
+determinantaboveincreases,representingthetruefeaturedensityof
+Ourdecoderdisashallow2-layerMLPmwithnobiastermsusedand
+thegrid.
+64neuronsperlayer,whichislightweightandefficient. Aftereach
+Thoughanaccuratedescriptionofthefeaturedensityoftheencoder,
+layerbesidesthelastlayer,ReLUactivationisusedasanonlinearity.
+thisformulationsuffersfromalargedrawbackinthatthereisnogra-
+WeusetheTiny-CUDA-NNpackage[19]fortensor-coreaccelerated
+dienttochangethetransformationmatricesGwhenapointisoutside
+decoding,whichreducestrainingtimebyabout10%comparedtoa
+ofagrid,asthegradientofρ willbe0everywhere. Thisisacritical
+purePyTorchdecoder.
+componentforlearningthetransformationmatricesinourmethod,and
+Scaling. Unlike other data formats that SRNs represent such as
+withoutit,thegrid’sscales,translations,etc.,cannotupdatebasedon
+images,radiancefields,anddistancefields,scientificdatavaluesare
+theerrorofpointsoutsideoftheirlocaldomain.
+generallynotbounded,posingachallengeforthedecodertoaccurately
+Therefore,weuseagaussianapproximationofthefeaturedensity,
+representtheunknowndatarange.Wetacklethiswithapreprocessing
+which is differentiable everywhere. Specifically, we use a class of
+stepbeforetrainingthatidentifiestheminimumandmaximumvalues
+gaussianfunctionscalledflat-topgaussiansorsuper-gaussians.Aflat-
+forthevolumethenetworkwillrepresentandsavingthosealongwith
+topgaussianisthesameasthenormalgaussianequationwithapterm
+thenetwork.Then,thedecodingiscalculatedasd(y)=m(y)·(max−
+intheexponent:
+min)+min where m is the MLP in the decoder, min is the saved
+minimumvalue,andmaxisthesavedmaximumvalue.Thisformulation (cid:18) (cid:18)(x−µ)2p(cid:19)(cid:19)
+allows us to avoid numerical issues by scaling the network output, g(x,p)=Aexp − , (6)
+whichresultsintheMLPlearningtooutputvaluesbetween0and1.
+2σ2
+Morespecificscalingforspecificdatatypes,suchasz-score-,log-,and
+whereAisanormalizingcoefficient,xisthelocation,µisthecenter
+exponential-scaling,isnottestedinthispaperandislefttofuturework.
+ofthedistribution,σ isthestandarddeviationofthedistribution,and
+4.2 Learningfeaturegridtransformationmatrices pisthestrengthoftheflat-top. As pincreases,thefunction’sshape
+becomemorebox-like.Seeoursupplementalmaterialattheendofthis
+Theadaptivityofourmodelstemsfromthelearnabletransformations
+documentforanexample.
+for each feature grid in the encoder. The goal during training is to
+Usingtheflat-topapproximationforfeaturedensityboxfunction,
+localizefeaturegridson/aroundregionsthathavehigherror.Wefocus
+wegivethefinalformofρ(x)as:
+morenetworkparameterstothosespatialregionswithhigherrorin
+ordertoimprovereconstructionqualityinthatregion. (cid:32) (cid:32) (cid:32) (cid:33)(cid:33)(cid:33)
+M−1 2
+While the idea is intuitive, naively attempting to learn the trans- ρ(x)= ∑ det (cid:0) G i,0:3,0:3 (cid:1) ·exp − ∑(G i (x) d )2p , (7)
+formation matrices defining each grid is not possible using only a
+i=0 d=0
+reconstructionloss(suchasL1orMSE).Thisisadirectconsequence
+ofourencoding(Equation2),whichreturnsa0featureifaquerypoint whereG i (x) d isthetransformedcoordinateinthex-,y-,andz-axisfor
+isoutsideofagrid. Thismeanstheonlygradientsthatwillupdatea d=0,1,2.Sincethecenterofthelocalcoordinatespaceis0andthe
+transformationmatrixarefrompointsthatresidewithinthatgrid,so standarddeviationis1,thegaussianequationdoesnotrequiretheµ
+higherrorregionsoutsideofafeaturegridwillnot“pull”thefeature orσ termsinthetransformedspace.Thisformulationisdifferentiable
+gridtowarditasdesired. everywhere,facilitatingpropertraining.Experimentally,wefindp=10
+Toproperlytrainthefeaturegrid’stransformationmatrices,wein- tobestrongenoughtomatchtheboxshapeofthefeaturegridwithout
+troduceafeaturedensityloss,whichisaquantifiableanddifferentiable beingtoostrongsoastohaveexplodinggradientsontherampstoand
+metricforthedifferencebetweenthecurrentfeaturedensityρ,anda fromtheflat-top.
+derivedtargetfeaturedensityρ∗.Weusethetermfeaturedensitytode- Targetfeaturedensity.Withawaytocalculateourcurrentfeature
+scribetheaveragenumberoffeatures(fromthefeaturegrids)thatexist densityatanarbitrarypoint,wenowrequireatargetfeaturedensity
+perunitvolumeatsomepointinspace.Inthissection,wewilldiscuss tosteertowardduringtraining.Ourgoalistoincreaseρ(x)wherethe
+howwecalculatethecurrentfeaturedensityinadifferentiablemanner, errorisrelativelyhighanddecreaseρ(x)whereerrorisrelativelylow.
+
+===== PAGE 5 =====
+Weformulateatargetfeaturedensityforacoordinateρ∗(x)according Earlystopping.Ourformulationpresentsachallengefortheneural
+tothefollowing: networkparametersinourAPMGSRNinthatifbothtrainingstep(1)
+and(2)occursimultaneously,themodelistrainingtochaseamoving
+ρ∗(x)=exp (cid:18) h log(ρ (x)+ε) (cid:19) (8) target. The parameters are updated from L rec with the assumption
+h(x)+ε scaled thatthefeaturegridsarestatic, butthegridsaremovingwitheach
+updatestep(2). Fixingthefeaturegridsasearlyaspossibleisessen-
+whereh(x)isthemodel’serroratlocationx,histheaveragemodel tialforthenetworktofine-tunethefeaturegridparameterstotheir
+error(inpractice, theaverageerroroverabatch), ρ (x)isρ(x) locationinspace,aswellastoreducetrainingtimespentupdatingthe
+scaled
+dividedbyitssumovertheset(torescalethedensitybetween0and1), transformationmatriceswhentheymayhavealreadyconverged.
+andεisasmallnumbertoavoiddividingbyzeroandothernumerical Whiletrainingthetransformationmatrices,wekeeparunningtrack
+issues.Inlanguage,Equation8willlogarithmicallyscalethecurrent of L each iteration, and set an early stopping flag when the
+density
+(scaled)featuredensityaccordingtotherelativeerrorateachposition. 1000-iterationmovingaverageofL hasnotreducedby0.01%.
+density
+Iftheerrorisexactlytheaverage, thenthetargetfeaturedensityis Alternatively,ifthisearlystoppingcriteriaisnotmetafter80%ofthe
+unchangedwithrespecttoρ scaled .Thislogarithmicscalingassuresthat totaltrainingsteps,westopupdatingthetransformationmatricesin
+moreimportanceisplacedonincreasingfeaturedensityinregionswith ordertoallowtheothernetworkparameterstolearngivenfixedfeature
+verylargerelativeerror,anddecreasingfeaturedensityinregionswith gridpositions.
+verysmallrelativeerror. AsingleAPMGSRNmodeltakesatmost4minutestotrainfor50k
+Featuredensitylossfunction.Toquantifythedifferencebetween iterationswiththehyperparametersexperimentedwithinthispaper.
+thecurrentfeaturedensityandthetargetfeaturedensity,weviewthis Often,thegridsconvergequickly,reducingtrainingtimetoasshortas
+asadistribution-matchingproblem.Wecalculateourfeaturedensity 40seconds.
+lossoverasetofcoordinatesX as
+1 (cid:18) ρ∗(x) (cid:19)
+L = ∑ρ∗(x)log , (9) 4.3.3 Initialization
+density |X| ρ (x)
+x∈X scaled
+With feature grid positions being crucial to the performance of our
+where|X|isthenumberofcoordinatesinX.Thelossfunctionmeasures model,theinitializationofthetransformationmatricesisarelevant
+therelativeentropyfromthecurrentfeaturedensitytothetargetfeature factorintrainingspeedandmodelaccuracy. Weinitializeourtrans-
+density, andisalsoknownastheKullback–Leiblerdivergence(KL formationmatricestocoveranearglobaldomainwithsmallrandom
+divergence).Thislossfunctionprovidesgradientsthatcaneffectively shears,rotations,andtranslations.Thediagonalsofthematrices(repre-
+updatetheparametersofeachfeaturegridtomatchthecalculatedtarget sentingthescaleofthegrid)aresampledfromN (1,0.05),whilethe
+featuredensity. remainingentriesinthefirstthreerowsofthetransformationmatrix
+are sampled from N (0,0.05). This initialization assures that each
+4.3 APMGSRNtraining (relevant)entryinthetransformationmatrixisnon-zerosothatitmay
+Inthissection,wecoverthelosses,trainingroutine,andinitialization contributetothefinaloutput,guaranteeinggradientscanbeusedto
+weuseforAPMGSRN. updateeachentryofthematrix.Additionally,thedomainscreatedwith
+thisinitializationschemeareallnearlyequaltotheglobalextents,and
+4.3.1 Lossfunctions. sowhilefixedatthebeginningoftraining(seeSection4.3.2),each
+Weusetwolossfunctionswhiletraining-areconstructionlossL recand grid is initially helping learn the global domain, providing a better
+thedensitylossL describedinEquation9.Thereconstruction approximationofwhichregionswillbechallengingtolearn.
+density
+lossisthemean-squarederror(MSE)betweenthemodeloutputandthe Besidesourtransformationmatrices,weinitializeourfeaturegrids
+groundtruthdataL rec = |X 1 | ∑x∈X (f(x)−v(x))2,whereX isabatch f s r m o a m ll U ran (− do 0 m .0 n 0 e 0 ss 1, a 0 s .0 fo 0 l 0 lo 1 w ), in e g nc M ou ü r l a le g r in e g ta n l e . a [ r 2 - 0 z ] e . ro O i u n r it d i e a c l o g d u e e r ss n e e s tw w o i r th k
+ofcoordinates,|X|isthenumberofcoordinates, f istheSRN,and
+weightsareinitializedfollowingGlorotandBengio[5].
+v(x)returnsthegroundtruthdatavalueatspatialpositionxviatrilinear
+interpolation.
+5 DOMAINDECOMPOSITIONSCENEREPRESENTATION
+4.3.2 Trainingroutine.
+Eachtrainingstephastwoparts:(1)updatethefeaturegridanddecoder Itmaynotalwaysbefeasibletotrainasinglemodelforsomelarge-
+parametersusingL rec,(2)updatethetransformationmatricesusing scaledatafortworeasons.Fromoneend,astrainingdatabecomemore
+L . Specifically, L is the only loss providing gradients complexwithhigherresolutions,largerneuralnetworksarenecessary
+density density
+to update the transformation matrices G, and L rec is the only loss toobtainadequatereconstructionaccuracy,whichmeanslongertrain-
+providinggradientstoupdatethefeaturegridvaluesF anddecoder ingtimesandalargemodelfootprintondisk. Asmodelcomplexity
+weights. Aslongasthemodelistraining,step(1)willhappenevery increases,GPUmemorymaybecomeabottleneckduringtrainingor
+iteration. However,performingstep(2)duringeachiterationwould training time becomes unacceptably long. From the other end, the
+slowdowntrainingandpotentiallynegativelyimpactreconstruction large-scaledatawewishtomodelwithanSRNmaynotfitwithinGPU
+qualityforreasonsdiscussedinthefollowingparagraphs.Therefore, memoryforefficientqueryinthetrainingloop.ThemainCPUmemory
+weuseafewtechniquestominimizethenumberofstep(2)updates. canbeusedtohostdataandsupporton-demanddatatransfertothe
+Delayed start. Since L is dependent on the error for the GPUfortraining, butiscostlyduetotherandomsamplingofdata
+density
+currenttrainingiterationL rec,theupdatetothetransformationmatrices pointsduringtraining.IftheCPUmemoryalsocannotsupporthosting
+willbemoreusefulwhenthemodelhasalreadyseenenoughtoknow thedata,thenanout-of-coresolutionistheonlyoptionavailable.Both
+wherethelow-andhigh-errorregionswillbe.Whenthemodelbegins optionshavebeenexploredbyWuatal.[32].
+training,theerrordistributionmayberandombasedonthenetwork Instead of a complicated and inefficient out-of-core sampling
+initialization, grid initialization, and data. Therefore, we delay the method,wetakeamodel-parallelapproachtomodellingalarge-scale
+trainingforthetransformationmatricesuntiltherestofthenetworkhas volume. We propose that instead of a single network representing
+beenbrieflytrainedonthedatasoastoremovemostofthenoisefrom thevolume,weuseadomaindecompositionofmodels,whereeach
+initialization. Wefindthat500iterations(withourlearningrateand model has learned a separate brick of the volume. The models are
+networksizes)isenoughtoprovidecleardetailsaboutwhatregions arrangedinagrid,anddonotrequirecommunicationduringtrainingor
+ofthevolumewillbehardtolearn,sothetransformationmatricesare inference.WediscussthedatapartitioninginSection5.1,thetraining
+frozenforthefirst500iterations,andareupdatedaccordingtoL procedureinSection5.2,andqueryingasetofmodelsduringinference
+density
+afterthat. inSection5.3.
+
+===== PAGE 6 =====
+5.1 Datapartitioning i+Ij+IJk.Withthecorrectnetworkdeterminedtoperforminference
+with,theglobalcoordinatecanbescaledtothenetworkslocaldomain
+Topartitiondataintobricksforonenetworktobetrainedperbrick,
+forproperinference.
+weuseagridofnetworkscoveringthedomain.Seeoursupplemental
+Ourimplementationloopsoverallnetworkstodoevaluationsfor
+materialforafigureillustratingthis.Aheadoftraining,gridresolution
+each,butasignificantspeedupcouldbeachievedwithfurtherengineer-
+I,J,K mustbechosen,representingthenumberofnetworksforthe
+ingeffort,asshownbyReiseretal.[23],whodevelopcustomCUDA
+width,height,anddepthofthevolume,respectively.Werecommend
+codeforinferencewithintheirsetofnetworksforradiancefields.We
+pickinganI,J,Ksuchthattheresolutionofthegridassignedtoeach
+leavethistofuturework, butexpecttheinferencetimeoflargedo-
+networkisroughlythesameaspectratioasthefeaturegridsinthe
+model. Forinstance,ifthefeaturegridsare323,chooseI,J,K such maindecompositionmodelstobemuchquickerwheninferencecode
+iswrittenincustomCUDAcodethatparallelizesnetworkevaluation.
+thateachmodelisassignedaroughlycube-shapedvolume.
+Ghostcells.Inordertomitigateboundaryartifactsalongadjacent
+6 NEURALVOLUMERENDERING
+networkboundariesduringvisualization,weexperimentwiththeuse
+ofaghostlayerofcells,whicharecellsthatoverlapbetweennetworks. Forfaircomparisonbetweenthemodels,wedevelopaPython/PyTorch
+Duringdatapartitioning,thismeansthattheextentsofanetworkwill [21]-basedneuralvolumerenderer(includedwithourcodeonGitHub)
+get extended by some number of ghost cells along each axis. This thatsupportsourownAPMGSRNaswellasstate-of-the-artmodels
+solution does not guarantee that seams will be removed, but tends fVSRN[30]andneuralgraphicsprimitives(NGP)usingahash-grid
+to reduce the effect of them, as the networks should have less of a encoding[20], ontopofrawdatavolumerendering. AnyPyTorch
+difference along boundaries if they are learning beyond the actual modelthatcansupportmapping3Dcoordinatestoanoutputdensity
+extent.InourexperimentsinSection7.2,wetestwithbetween1and canalsobepluggedinwithminimalreconfiguration. Wefavorease
+16ghostcells,forexample.Wediscussamorein-depthsolutioninour ofuseoverrawperformancewiththisrendererwithaplug-and-play
+futurework,butdonotgobeyondghostcellsinthispaper. style coding requiring minimal changes to a user’s PyTorch model,
+and hope it is useful for future research on SRNs for sci-vis. Our
+5.2 Domaindecompositiontraining renderersupportsarbitrarytransferfunctionandviewdirection,and
+usesprogressiverenderingtosupport60+fpsrenderingforimmediate
+ToreducethetrainingtimeneededfortheI·J·Kmodels,wedissectthe
+feedbackwhilepanning,rotating,andzooming. Wesupporttransfer
+domainandtrainthemodelsinparallelacrossavailableGPUs.Since
+functionsexportedfromParaViewdirectlytoourrenderer,andinteract-
+large-scaledataareoftengeneratedbypowerfulmachines,weassume
+ingwiththescenefollowsthetypical3Dviewerparadigmofclicking
+auserislikelytrainingonacomputenodewithmultipleGPUs.Our
+anddraggingrotatingaroundthescene,thescrollwheelzooms,and
+domaindecompositiontrainingroutinepre-calculatestheextentsof
+middle-mouseclickinganddraggingpansthecamera.Weuse3Dren-
+eachnetworkwithinthevolume’sextents(includingghostcells)and
+deringhelperfunctionsfromthenerfaccPythonpackage[10],which
+generatesalistofjobsthatareassignedtotheavailableGPUs.When
+providesCUDA-acceleratedraymarchingandcompositing.
+aGPUfinishestraining,theGPUreturnstotheavailableGPUslist,
+Forimprovedinteractivity,weimplementaprogressiverendering
+whereitwaitstobeissuedthenextmodeltotrain.WhenaGPUbegins
+schemethatrenderstheimageinacheckerboardpattern,evaluatingthe
+training,anAPMGSRNmodelisinitialized,andonlythedatawithin
+pixelsinorderofanimagehierarchy.Aftereachprogressiverendering
+itsassignedextentsareloadedtotheGPUmemory.ThisreducesI/O
+pass, the in-progress image displayed on the screen is a bilinearly-
+overheadandisefficientwithdataformatssuchasNetCDFsupporting
+upscaledversionofthecurrentfinest-availableimagefromtheimage
+parallelfileaccessandarbitrarycroppingfromdisk.
+hierarchy masked with the fully evaluated pixels. We also offer a
+Earlystopping.Justasweemployearlystoppingtostoplearning
+trade-offbetweeninteractivityandfullrendertimewithauserchoice
+thetransformationmatricesearlierduringtrainingtoconvergefaster,
+forbatchsize,withlargebatchsizesslowingdowninteractivitybut
+wealsouseearlystoppingonmodelswithinthedomaindecomposition
+speedingupfull-framerendertimes,andviceversaforsmallbatch
+whiletrainingsotheGPUisfreedforthenextmodeltotrainquicker.
+sizes.OurprogressiverenderingkeepsGPUmemoryminimizedand
+WeuseaplateaulearningrateschedulerthatdetectswhenL rechasnot
+quicklygeneratesgoodapproximationsofthefinalimagewhileoffering
+decreasedby0.01%over500iterations. Whenthisistriggered,the
+interactiveframerates(30-400fps).
+learningrateofthemodel’sparametersisreducedbyafactorof10.
+Whenthisistriggered3times,wefinishtrainingthemodel.Thiscan
+7 EXPERIMENTS
+reducetrainingtimesdramaticallyinregionswheretheremaybevery
+sparsedata(downto20secondspermodelinourexperiments). Weperformexperimentstotestthetrainingandreconstructionmet-
+ricsofourproposedAPMGSRNmodelinSection7.1. Ourdomain
+5.3 Domaindecompositioninference decompositiontrainingapproachisevaluatedinSection7.2.Lastly,we
+visualizetrainedmodelswithourrendererinSection7.3.Ourdatasets
+Aftertraining(presumablyonaremoteserver),theneuralnetworks
+andbriefdescriptionsareshowninTable1.
+can be moved to a local workstation for visualization. Once on a
+Hyperparameters and evaluation hardware. To save
+localmachine,allmodelsareloadedintoGPUmemory. Sinceeach
+page space, model hyperparameters for each size SRN
+networkinthedomaindecompositionrepresentsacertainspatialextent,
+(small/medium/large/decomposition) are available in GitHub in
+eachglobalquerylocationneedstobemappedtothecorrectmodel
+the“BatchRunSettings”folder,astherearemanyhyperparametersto
+forinference, sowedevelopaspatialhashingfunctionforefficient
+enumerateforeacharchitecture.Forourmodelspecifically,thenumber
+inference. ofgridsweuseiseither16or32,thegridresolutionvariesfrom163to
+Spatialhashingfunction. Toefficientlydeterminewhatmodela 643,andthenumberoffeaturesperfeaturegridvertexiseither1or2.
+querylocationbelongsto,weimplementaspatialhashingfunctionto
+Wefindthatinferencespeeddegradesabove64grids,andaccuracy
+hashinput3Dglobalcoordinatestothecorrectindexinthearrayof
+doesnotimprovesignificantlywithmoregridsormorefeaturesper
+models.Weloadmodelsintoanarrayinx-,y-,z-dimensionorder.With
+gridtojustifytheincreasedstoragecost.Gridresolutionhasthelargest
+thisorderinmind,wecanhashinputglobalcoordinatesdirectlytoarray
+impactonbothnetworkperformanceandnetworkstoragesize.
+index.Assumingaglobalspatialcoordinatepisinthedomain[−1,1]3,
+Trainingforallmodelsandcompressiontestsarerunonaremote
+(cid:106) (cid:107) (cid:106) (cid:107)
+wecalculatethegridindexforpwithi= Ipx+1 ,j= J py+1 ,k= NVidia DGX system with 8 NVidia 40GB A100 GPUs, a 64-core
+2 2
+(cid:106) (cid:107) AMDEPYC7742processor,and1TBofsystemmemoryconnected
+Kpz 2 +1 ,where⌊·⌋istheintegerflooroperation. Ifanydimension toaLustre-basedfilesystem. Renderingevaluationisperformedon
+of the coordinate has exactly 1.0 for an axis, then the result is an aWindows11PCwithaNVidia2080Ti,a12-coreAMDRyzen9
+outofboundlocation,sothesevaluesneedtobeclampedsuchthat 3900X,and32GBofsystemmemory.
+i<I,j<J,k<K.Sincethenetworksarestoredinalist,the3Di,j,k BaselineSRNs.Neuralgraphicsprimitives(NGP)[20]usesahier-
+indexforthenetworkisflattenedinC-order,givingthefinalhashas archicalhashgridencodingschemethatusesarandomhashfunction
+
+===== PAGE 7 =====
+Table1:Datasets,theirsizeondisk(inraw,single-precisionfloating β1 =0.9,β2 =0.99withalearningrateof0.01. Ourtransformation
+pointrepresentation), andtheirdescriptions, aswellasquantitative matricesusealearningrateof0.001.Eachiteration,abatchof100,000
+resultsforSRNmodelstrainedtorepresenteachdataset.Trainingtype coordinatesaresampleduniformlyfrom[−1,1]3,andthegroundtruth
+iseithersingle(forsinglemodel)orandecompositiongridresolution valuesaretrilinearlyinterpolatedfromthevolume.
+forourdomaindecompositiontrainingapproach.Fordomaindecompo-
+sitionmodels,averagetrainingtimepermodelisreportedsincemodels 7.1 Scenerepresentationnetworkcomparison
+aretrainedinparallel.Bestperformingmodelsinonesizecategoryare
+Wecompareourmodelagainsttwostate-of-the-artscenerepresentation
+boldandunderlined.Peaksignal-to-noiseratio(PSNR)isgiveninthe
+networks,neuralgraphicsprimitives(NGP)[20]andfVSRN[30],for
+dataspace.
+datareconstructionqualityandtrainingtimesatfixedmodelsizes.
+Singlenetworkperformance.Acrossresultsfromeachdatasetand
+Dataset Modelstoragesize Model Trainingtype PSNR(dB)↑ Trainingtime
+fVSRN single 43.924 58s networksizeshowninTable1,APMGSRNisfirstforreconstruction
+Plume Small-280KB NGP single 46.713 1m32s peaksignal-to-noiseration(PSNR-higherisbetter)inallbut3settings.
+512×1282 A
+fV
+P
+S
+M
+R
+G
+N
+SRN s
+s
+i
+i
+n
+n
+g
+g
+l
+l
+e
+e
+4
+4
+8
+9
+.
+.
+9
+3
+5
+3
+4
+2
+5
+5
+2
+7
+s
+s APMGSRN’sadaptivityseemsmostdominantinsomewhatsparsedata,
+32MB Medium-4MB NGP single 50.847 1m7s
+Velocitymagnitudeof APMGSRN single 56.327 1m20s suchasplume,Nyx,andsupernova,whereitoutperformsothermodels
+p p S a l o u r m t m ic e e l w e s s h im a in t u s a l p a s a ti o r o s l n a e r . . Large-64MB f N A V G P S M P R G N SRN s s s i i i n n n g g g l l l e e e 5 5 5 2 3 8 . . . 1 2 1 6 8 3 5 2 4 1 2 2 m m m 4 1 2 6 0 5 s s s b N y G 2 P + o d n B ly a f t or th t e he la a r s g t e er s o t i m d o d d a e ta l s s e i t z b e e . c O au u s r e m o o f d th e e lu h n ig d h er d p e e g r r f e o e rm of s s a p g a a rs in it s y t ,
+APMGSRN 4×1×1 58.363 56s
+fVSRN single 29.110 55s whichNGPexcelsat. Examplesoflearnedgridpositionsareshown
+Small-280KB NGP single 28.391 1m33s
+Nyx[1] APMGSRN single 29.424 51s inFigure1,andverifiesthatthegridslearntomigratetoregionswith
+2563 fVSRN single 37.022 57s complexfeaturesregardlessofdataset.
+64MB Medium-4MB NGP single 35.142 1m8s
+Logdensityofdarkmatter APMGSRN single 37.807 1m34s Trainingtimesacrossmodelsaresimilar,withourmodelbeingthe
+incosmologicalsimulation. fVSRN single 42.092 1m46s
+Somewhatsparse. Large-64MB N A G PM P GSRN s s i i n n g g l l e e 4 4 2 4 . . 7 0 5 7 0 5 2 3 m m 1 7 0 s s l o e f as u t si p n e g rfo a r s m e a c n o t n c d o l m os p s ar f e u d nc to tio N n G f P or an u d pd fV at S in R g N o . u T r h t i r s a i n s sf a o c r o m n a s t e i q o u n e m nc a e -
+APMGSRN 2×2×2 46.118 1m35s
+fVSRN single 39.505 54s trices,andmorematrixoperationspermodelforwardpassduetothe
+Small-280KB NGP single 41.523 1m29s
+Supernova APMGSRN single 41.891 1m16s transformationsrequiredbeforefeaturegridinterpolation.Ourmulti-
+40 4 3 32 M 3 B Medium-4MB f N V G S P RN s s i i n n g g l l e e 4 4 2 4 . . 6 8 9 1 7 1 5 1 6 m s 8s gridencodingisapurePyTorchimplementation,butcustomCUDA
+Entropyinsupernova APMGSRN single 46.831 1m19s codelikethatusedbyNGP,couldimprovemodelperformance.
+simulation. fVSRN single 46.271 1m46s
+Somewhatsparse. Large-64MB N A G PM P GSRN s s i i n n g g l l e e 4 4 7 9 . . 8 8 0 8 6 0 2 2 m m 3 4 2 1 s s
+APMGSRN 2×2×2 50.644 35s
+Asteroid fVSRN single 31.072 54s
+10003 Small-280KB N
+A
+G
+PM
+P
+GSRN
+s
+s
+i
+i
+n
+n
+g
+g
+l
+l
+e
+e
+3
+3
+3
+0
+.
+.
+7
+1
+1
+3
+3
+0
+1
+1
+m
+m
+3
+4
+2
+3
+s
+s
+3.73GB fVSRN single 33.783 54s
+Volumefractionofasteroid Medium-4MB NGP single 39.012 1m6s
+pluswaterfieldsfrom APMGSRN single 35.799 1m49s
+simulationofan fVSRN single 39.121 1m47s
+a S s c te iV ro is id co h n it t t e in st g 2 t 0 h 1 e 8 oc d e a a ta n . . Large-64MB N A G PM P GSRN s s i i n n g g l l e e 4 3 2 9 . . 9 4 2 5 8 5 2 2 m m 2 4 4 9 s s
+Verysparse. APMGSRN 4×4×4 43.188 45s
+fVSRN single 27.379 58s
+Isotropic[11,22] Small-280KB NGP single 27.007 1m32s
+10243 A
+fV
+P
+S
+M
+R
+G
+N
+SRN s
+s
+i
+i
+n
+n
+g
+g
+l
+l
+e
+e
+2
+3
+7
+1
+.
+.
+6
+5
+2
+7
+2
+0
+5
+5
+5
+8
+s
+s
+4GB Medium-4MB NGP single 30.786 1m8s
+Velocitymagnitudefield APMGSRN single 31.825 1m14s
+offorcedisotropic fVSRN single 36.858 1m46s
+N tu o rb t u s l p e a n r c s e e . . Large-64MB N A G PM P GSRN s s i i n n g g l l e e 3 3 7 8 . . 1 1 9 2 8 0 2 3 m m 1 2 0 3 s s
+APMGSRN 4×4×4 41.086 57s
+Rotstrat[11,22]
+40963
+250GB Small-55MB APMGSRN 3×3×3 41.322 1m3s
+Velocitymagnitudeof Medium-183MB APMGSRN 3×3×3 44.294 1m15s
+rotatingstratified Large-864MB APMGSRN 3×3×3 49.074 1m58s
+turbulence,t=4. Fig.4: Examplesof3gridinitializationsandtheeffectonfinalgrid
+Notsparse. locationsanddatareconstructionPSNR.Underlyingdatavolumeren-
+Channel[9,11,22]
+7680×1568×10240 dereddepictsgroundtruthdataforclarityofgridlocationswithrespect
+Channelfl 4 o 5 w 0G a B tReynolds 97MB APMGSRN 4×1×6 40.055 35s totherawdata.
+number≈5200,t=10.
+Notsparse.
+Importanceofgridinitializationandgridvisualization.Asfea-
+turegridlocationinthevolumeistheonlymeansofencodingcoordi-
+to map spatial coordinates to hash table entries which hold feature natestoahigh-dimensionalfeaturespaceforlearning,theinitialization
+values. Theencodingschemeallowshashcollisionsandcopeswith ofthegridsmayaffectlearningquality.Weexperimentwithgridinitial-
+thembylettingthegradientsaverage,whichputsmoreemphasisonthe izationwithasmallsizedmodeltrainedonthesupernovadataset.We
+higher-errorregions.Therefore,NGPbenefitsfromveryhighsparsity, usethreeinitializationtechniquesforthegrids:(1)ourrecommended
+wherehashcollisionsarefrequent,butamajorityofthespaceisempty initializationasdescribedinSection4.3.3,(2)ourrecommendedini-
+anyway.Thesecondmodelwecomparewithisfastvolumetricscene tialization,withthegridscalesincreasedby20%soastocoverextra
+representationnetwork(fVSRN)[30],whichisastandardfeature-grid empty space outside of the volume, (3) initializing grids at a small
+based SRN composed with Fourier frequency encoding [27]. The scale,randomlydistributedwithinthedomain. Theresultsoftheex-
+feature grid is dense and lines up with the extents of the data. For perimentareshowninFigure4. Wecanseethatthefinalgridsand
+bothcomparisonmodels,weuseinitializationandtrainingroutinesas reconstructionqualityofthefirsttwoinitializationschemesaresimilar,
+suggestedbythepublicationtheywereintroducedin. butinitializingthegridstorandomspotswithasmallscaleperformed
+Training. Python3.9withPyTorch[21]areusedfortrainingall muchworse. Thegridsthat donotcoveranydatasittinginempty
+networks.Allmodelsusethesamefully-connecteddecoderfromTiny- spacehavenear-zerogradientforchanginganyofthetransformation
+CUDA-NN(TCNN)[19]with2layersof64neurons,acceleratedwith matrixparameters. Alargerlearningrateoralesspowerfulflat-top
+customfully-fusedCUDAcode.NGP’shashgridencoding[19]native gaussian can make up for this for some cases, but that may cause
+implementationfromTCNNisused,andweimplementfVSRNusing larger-scalegridstoseeunstableupdatestotheirparameters.Forbest
+TCNNforhighefficiency,butourownmodelusesPyTorchwithsingle results,werecommendourdefaultinitializationofglobal-scalegrids
+precision for the multi-grid encoding. All networks are trained for withsmallrandomperturbations,butwebelievetheremayberoomfor
+50,000 iterations or until an early stopping criteria, as discussed in improvedperformancewithdifferentdifferentiableapproximationsof
+Section4.3.2. Forallmodels, theAdam[8]optimizerisusedwith griddensityforsmootherlearning.Werecommendreadersviewour
+
+===== PAGE 8 =====
+supplementalmaterialforvideosoffeaturegridsduringtrainingon eachofthedomaindecompositionmodelswillhavetheirowndecoder
+thesmallerdatasetsexperimentedwith,asitgivesastrongintuition andsetoffeaturegridsthatmaycreateandadvantageoverthesingle
+forwhatthenetworkislearningandhowitislearningit.Inthefuture, largemodel.Thedownsideofadomaindecompositionmodelisthat
+othergridinitializationstrategiesmayproveusefulforbetterlearned trainingmaytakelongerifyouonlyhave1GPUandtrainserially.
+gridpositions.Additionally,webelievethatscalinguptheflat-topgaus- FordatathatcannotfitinasingleGPU,suchasrotstratandchannel,
+sianstrength(startingfrom1.0)duringtrainingcanhelpsituationslike ourdomaindecompositionapproachprovidesanefficientalternativeto
+oursmallinitializationscheme,becausegradientswillnotapproach0 anout-of-coretrainingroutine.InTable1,welisttheaveragetraining
+rapidlyfordataoutsidethegrid. timepermodelforthedomaindecompositionmodels. Ourtraining
+machinehad8GPUstraininginparallelandthetotaltrainingtimewas
+7minuteswithdataI/Oforrotstrat.
+Fig.5:ComparisonofAPMGSRNwithTTHRESHandSZforcom-
+pressingtheisotropicvolume(10243).Our“compression”timeisthe
+timeittakestotrainthemodel,andourdecompressiontimeisthetime
+ittakestoqueryeachpointinthevolume.
+Compression.Thoughdatareductionisnottheonlyintendeduse Fig. 6: Zoom inof volume render from identical 4×4×4 domain
+caseforourapproach,norisitsomethingwedesignforspecifically decompositionnetworkstrainedwitheither1or16ghostcells.Aseam
+(such as with network weight quantization for further data reduc- isclearwith1ghostcell.
+tion[16]), webelieveitisusefultothecommunitytocomparethe
+compressionabilityofstate-of-the-artSRNswithstate-of-the-artcom-
+Effectofghostcells.Bydefault,ourdomaindecompositionhas1
+pressors. WecomparecompressionresultsfromTTHRESH[2]and
+ghostcellforcorneralignmentacrossmodels.Weshowtheeffectof
+SZ3[12,13,34]withourapproachinFigure5. Wedonotcompare
+increasingghostcellswithinourdomaindecompositionmodelsinFig-
+toarendering-focusedcompressorsuchascudaCompress[28]ora
+ure6,whichisavolumerenderingoftwonetworks-onetrainedwith
+bricked version of TTHRESH [2], as this has been done by recent
+thedefaultof1ghostcell,andonewith16ghostcells.Theboundary
+work[30]showingthatitsdecodingissignificantlyslower,compres-
+artifactisvisibleonlyintherenderwithonly1ghostcell.However,a
+sionratessmaller,memoryuseishigher,andimagequalityisworse
+significantPSNRdropof-1dBisnoticedwiththisincreaseinghost
+thanstate-of-the-artSNRs.
+cells,attributedtothefactthatanetworkinthedecompositionlearning
+AsshowninFigure5,ourapproachonlyprovidesahighercompres- avolumeofsize2883isa42%largervolumethantheoriginal2563
+sionratiothanTTHRESHorSZ3ata10000×datareductionratewith
+volumelearnedonintheversionwithoutghostcells.Theredundancy
+areconstructionqualityofunder30dBPSNR,andisotherwiseless
+oflearningasignificantportionofthefullvolumeinmultiplenetworks
+compressivethanstate-of-the-artcompressors.Thethroughput(decom-
+reducesthelearningcapacityofthesetofnetworks.Sincetheartifacts
+pression)fromAPMGSRNismuchquickerregardlessofcompression
+arefairlyminorwhilereducingperformance,werecommendusing1
+level,decodingontheorderof500millionpointspersecond,butkeep
+orfewghostcellsforgeneralvolumerendering,but16ghostcellsfor
+inmindthatAPMGSRNisdecodingontheGPUwhereasSZ3and
+taskslikeisosurfaceextractionwhereseamscanbeverydistracting.
+TTHRESHareonCPU.ThelargestdifferencebetweenAPMGSRN
+We consider future work for reducing the boundary effect between
+and these compressors is that our approach can efficiently perform
+networkswithanetworkcommunicationschemeduringtraining.
+arbitrarypointevaluations,whereasSZ3andTTHRESHbothrequire
+decompressingtotheoriginaldatasizebeforetrilinearinterpolation. 7.3 Neuralvolumerendering
+We also test compression on our two large datasets, rotstrat and
+Inthissection, weevaluatethesingleframeperformanceofneural
+channel.Thetestedcompressorstakesignificantlylongertocompress
+volumerendering.Theraymarchingandcompositingaredonewiththe
+ourlarge-scaledata, orfailtodosoatall. Infact, TTHRESHand
+samecode,sothetimingandmemoryusedifferenceisaccountedfor
+SZ3bothrunoutofmemoryonourmachinewith1TBofmemory
+solelybyqueryingtheSRNorrawvolumedata.
+whentryingtocompressthechanneldataset(450GB),andTTHRESH
+OursingleframerenderingresultsareshowninFigure7wherewe
+alsorunsoutofmemorywhentryingtocompresstherotstratdataset
+comparetherenderresultsofthelargesized(64MBondisk)models
+(250GB).SZ3successfullycompressesthe250GBrotstratdatain38
+forthesupernovadataset. Thereferencerenderusingthevolumeis
+minutes,resultinginacompressionratioof509×andareconstruction
+thequickest,butassumesthevolumecanfitinGPUmemory,whichis
+qualityof20.60dBPSNRafteranother14minutesofdecompression.
+notpossiblefordatasetslargerthan11GBonourtestmachine.NGP
+Bothoursmallandmediumsized(domaindecomposition)modelsfor
+providesthequickestrendertimesofthenetworksonour2080Ti,as
+rotstrat(seeTable1)achievehigherPSNRs(41.32dBand44.29dB)
+wellasthelowestmemoryuse. fVSRNisslowerlikelyduetothe
+withhighercompressionrates(4791×and1432×)whileonlyneeding
+Fourierfrequencyencoding.Ourmodelsareslowesttorender,buthave
+totrainfor34minutesifallmodelsaretrainedsequentiallyon1GPU,
+considerablybetterimagereconstructionshownbythehigherPSNR
+or5minutesinparallelon8GPUs.Additionally,ourdecodingtakes3
+andstructuralsimilarityindexmeasure(SSIM)[35]. Ourapproach
+minutesforthewhole40963volume.
+(singlemodel)requiresthemostmemoryduetothetransformation
+tothe64localgridspaces,requiring64×thememoryoftheglobal
+7.2 domaindecompositionnetworkevaluation
+coordinatesforthelocalspacecoordinates.
+We evaluate our domain decomposition training approach on each InFigure8,wecompareourtrained“medium”sizeddomainde-
+dataset,andshowresultsinTable1.Eventhoughthesmallerdatasets compositionmodelforthe250GBrotstratdatawithadownsampled
+do not require the domain decomposition to train without memory versionoftherawdatawithasimilarstoragefootprintasthemodel.We
+limitations, the domain decomposition model outperforms a single subsampletherawdataby11ineachdimensiontocreateavolumethat
+modelatthesamestoragesizeforeachdataset. Thisisexpected,as takes198MBtostore,whichisonlyslightlylargerthanournetwork
+
+===== PAGE 9 =====
+Fig. 8: Volume renders of the original rotstrat data, our “medium”
+sizemodelrepresentingthedata,andalowresolutionversionofthe
+originaldata,whichhasbeensubsampledby11ineachdirectionto
+haveasimilarstoragefootprintasthemodel.Eachimageisrendered
+at80002withthesamevisualmappingparameters.Metricslistedare
+PSNR/SSIMfortheentireimage(notjustzoomedportion).
+Fig.7: 10242 volumerendersofSupernovadata(4323)withastep
+size of 1 voxel. A batch size of 223 is used during forward passes.
+Thereferenceistherawdata(308MB),whiletheothersareneural
+representationsofthedataintheir“large”configuration(64MB),where
+(DD)meansdomaindecomposition. Thefirstrowofmetricslisted
+isrendertime/memoryuse,andthe2ndrowisPSNR(dB)/SSIM. Fig.9:Theinterfaceforourvolumerendererwithavolumerenderof
+Metricsareeachfortheentireimage,notthezoomin. andomaindecompositionmodeltrainedonthe450GBchanneldataset.
+(1)Theviewingareaforinteraction.(2)Dropdowntochoosetoload
+amodelordata(NetCDF).(3)Whichmodel/datatoloadfrom. (4)
+Colormaptouse. (5)Batchsizewhenqueryingthenetwork. Larger
+whichtakes183MBtostore.Weuseourrenderertogenerate80002
+reducestotalframetime,butrequiresmoreGPUmemoryandslows
+imagesofeachrepresentationofthedatawiththesamevisualmapping
+downinteractivity.(6)Samplesperray.(7)Resetscameraviewondata.
+parameters.Theimagefromourmodelachievesasignificantlyhigher
+(8)Opacitytransferfunctioneditor.(9)Relativemin/maxfortransfer
+30.70 dB PSNR compared with the render from the downsampled
+function.(10)Renderstatistics.(11)Savecurrentframebutton.
+datawhichonlyachieves22.24dB.Additionally,theneuralnetwork
+capturesfeaturesthatareentirelymissedbythesubsampleddata.
+WeincludeanimageofourrenderingapplicationinFigure9,but
+donotdiscussitindetailhere.Pleaseseesupplementalmaterialsfor
+avideousingthetoolinreal-time, aswellasadditionalqualitative bymultiplenetworks. Inourevaluations,wefindthatourproposed
+comparisonsofvolumerendersfromeachmodel. APMGSRNarchitectureoutperformsthereconstructionperformance
+ofotherstate-of-the-artmodelsatsimilarmodelsizesinbothdataspace
+8 LIMITATIONS andimagespace.Ourmodelcannotcompressaswellasstate-of-the-art
+Onelimitationofourmodelisthatmemoryuseblowsupandtraining compressorslikeTTHRESH,butachieveshighcompressionratewith
+speedsreduceasthenumberoffeaturegridsincreases.Thisisfromthe efficientvolumerenderinginthecompressiondomainwithouttheneed
+globaltolocaltransformation,whichneedstoallocatememoryequalto todecompresstotheoriginaldata’ssize.
+thememoryofthequerycoordinatestimesthenumberoffeaturegrids,
+Inthefuture,wethinkouradaptivefeaturegridscanbeaugmented
+andthenperforminterpolationforeachofthosecoordinates.Further
+intwoways:(1)thefeaturegridsneednotbetrilinearlyinterpolated-
+engineeringeffortcouldreducetheoverheadwithcustomCUDAcode
+anotherencodingscheme,suchasahashgridfromNGP,canbeused
+orbylimitingthenumberofgridsoperatedonatonce.
+forquerywithineachgrid,(2)thefeaturegridscouldextendthetime
+ThoughourneuralrendereriscompatiblewithanyPyTorchmodel
+dimension, creating4Dlearnablefeaturegridssupportingtemporal
+codedinPython,therendererisslowerthanwhatisreportedbycontem-
+interpolation. Reducing boundary artifacts is another key direction
+porarywork [30–32].Furtheroptimizationstothecodecouldimprove
+to improve upon to reduce distracting seams in visualizations. On
+therenderingspeedwhileremainingflexiblefornewPyTorchmodels
+theengineeringside,therearemanyplaceswhereoptimizationscan
+tobepluggedinwithease.
+improveefficiency,suchasthemulti-gridencoderordomaindecompo-
+sitionmodelinference. Ourapproachcouldalsoworkwithminimal
+9 CONCLUSIONANDFUTUREWORK
+changestorepresentnon-uniformgriddatatypes,suchasunstructured,
+In this work, we present a novel SRN called APMGSRN, a model point-based, or AMR, so long as the data can return a scalar value
+which excels at representing scientific data due to the adaptivity of foranarbitrarypointquery. Withtheincreasingpopularityanduse-
+themodel. Inordertotrainondatasetsthatcannotfitin-coreduring fulnessofSRNs,futureworktosupportneuralvolumerenderingin
+training,weproposeandomaindecompositionapproachfortraining matureopen-sourcesoftwaresuchasParaViewwouldgreatlybenefit
+andinferencethatdividesthedomainintoseparatechunkstobelearned thevisualizationcommunity.
+
+===== PAGE 10 =====
+ACKNOWLEDGMENTS [19] T. Müller. tiny-cuda-nn. https://github.com/NVlabs/
+tiny-cuda-nn,42021.4,7
+ThisworkissupportedinpartbytheUSDepartmentofEnergySciDAC
+[20] T.Müller,A.Evans,C.Schied,andA.Keller. Instantneuralgraphics
+programDE-SC0021360,NationalScienceFoundationDivisionofIn-
+primitiveswithamultiresolutionhashencoding. ACMTrans.Graph.,
+formationandIntelligentSystemsIIS-1955764,andNationalScience
+41(4),jul2022.doi:10.1145/3528223.35301272,3,5,6,7
+FoundationOfficeofAdvancedCyberinfrastructureOAC-2112606and
+[21] A.Paszke,S.Gross,F.Massa,A.Lerer,J.Bradbury,G.Chanan,T.Killeen,
+OAC-2311878. ThisworkisalsosupportedbyAdvancedScientific
+Z. Lin, N. Gimelshein, L. Antiga, A. Desmaison, A. Kopf, E. Yang,
+ComputingResearch,OfficeofScience,U.S.DepartmentofEnergy,un-
+Z.DeVito,M.Raison,A.Tejani,S.Chilamkurthy,B.Steiner,L.Fang,
+derContractsDE-AC02-06CH11357,DE-SC0022753,DE-SC0023193
+J.Bai,andS.Chintala.PyTorch:AnImperativeStyle,High-Performance
+underprogrammanagerMargaretLentz. DeepLearningLibrary. InAdvancesinNeuralInformationProcessing
+Systems32,pp.8024–8035.2019.6,7
+REFERENCES [22] E.Perlman, R.Burns, Y.Li, andC.Meneveau. DataExplorationof
+[1] A.S.Almgren,J.B.Bell,M.J.Lijewski,Z.Lukic´,andE.V.Andel.Nyx: TurbulenceSimulationsusingaDatabaseCluster. InProc.ACM/IEEE
+AMassivelyParallelAMRCodeforComputationalCosmology. The ConferenceonSupercomputing,pp.1–11,2007.7
+AstrophysicalJournal,765(1):39–53,2013.7 [23] C.Reiser, S.Peng, Y.Liao, andA.Geiger. KiloNeRF:Speedingup
+[2] R.Ballester-Ripoll,P.Lindstrom,andR.Pajarola. TTHRESH:Tensor NeuralRadianceFieldswithThousandsofTinyMLPs.2021IEEE/CVF
+CompressionforMultidimensionalVisualData. IEEETransactionson InternationalConferenceonComputerVision(ICCV),pp.14315–14325,
+VisualizationandComputerGraphics,26(9):2891–2903,2020.doi:10. 2021.1,2,6
+1109/TVCG.2019.29040638 [24] V.Sitzmann,J.N.Martel,A.W.Bergman,D.B.Lindell,andG.Wetzstein.
+[3] A.Chen,Z.Xu,A.Geiger,J.Yu,andH.Su.TensoRF:TensorialRadiance ImplicitNeuralRepresentationswithPeriodicActivationFunctions. In
+Fields.InProc.EuropeanConferenceonComputerVision,pp.333–350, Proc.NeurIPS,2020.1,2
+2022.1,3 [25] T.Takikawa,J.Litalien,K.Yin,K.Kreis,C.Loop,D.Nowrouzezahrai,
+[4] K.Genova,F.Cole,A.Sud,A.Sarna,andT.Funkhouser.Localdeepim- A. Jacobson, M. McGuire, and S. Fidler. Neural geometric level of
+plicitfunctionsfor3dshape.InProceedingsoftheIEEE/CVFConference detail: Real-time rendering with implicit 3D shapes. arXiv preprint
+onComputerVisionandPatternRecognition,pp.4857–4866,2020.2 arXiv:2101.10994,2021.1,2,3
+[5] X.GlorotandY.Bengio. Understandingthedifficultyoftrainingdeep [26] M.Tancik,V.Casser,X.Yan,S.Pradhan,B.Mildenhall,P.Srinivasan,J.T.
+feedforwardneuralnetworks. InProceedingsoftheThirteenthInter- Barron,andH.Kretzschmar. Block-NeRF:Scalablelargesceneneural
+nationalConferenceonArtificialIntelligenceandStatistics,vol.9,pp. viewsynthesis.arXiv,2022.2
+249–256,13–15May2010.5 [27] M.Tancik,P.P.Srinivasan,B.Mildenhall,S.Fridovich-Keil,N.Raghavan,
+[6] J. Han and C. Wang. CoordNet: Data Generation and Visualization U.Singhal,R.Ramamoorthi,J.T.Barron,andR.Ng. Fourierfeatures
+GenerationforTime-VaryingVolumesviaaCoordinate-BasedNeural letnetworkslearnhighfrequencyfunctionsinlowdimensionaldomains.
+Network. IEEETransactionsonVisualizationandComputerGraphics, NeurIPS,2020.2,7
+pp.1–12,2022.doi:10.1109/TVCG.2022.31972032 [28] M.Treib,K.Burger,F.Reichl,C.Meneveau,A.Szalay,andR.Wester-
+[7] K.Höhlein,S.Weiss,andR.Westermann.EvaluationofVolumeRepre- mann.TurbulenceVisualizationattheTerascaleonDesktopPCs.IEEE
+sentationNetworksforMeteorologicalEnsembleCompression.InVision, transactionsonvisualizationandcomputergraphics,18(12):2169–2177,
+Modeling,andVisualization.TheEurographicsAssociation,2022.doi:10 2012.8
+.2312/vmv.202211982 [29] C.WangandJ.Han. DL4SciVis: AState-of-the-ArtSurveyonDeep
+[8] D.P.KingmaandJ.Ba.Adam:AMethodforStochasticOptimization.In LearningforScientificVisualization.IEEEtransactionsonvisualization
+Proc.2015InternationalConferenceonLearningRepresentations,2015. andcomputergraphics,PP,April2022.doi:10.1109/tvcg.2022.3167896
+7 2
+[9] M.LeeandR.D.Moser.Directnumericalsimulationofturbulentchannel [30] S.Weiss,P.Hermüller,andR.Westermann.Fastneuralrepresentations
+flowuptoReτ=5200.JournalofFluidMechanics,774:395–415,2015. fordirectvolumerendering.ComputerGraphicsForum,41(6):196–211,
+7 2022.doi:10.1111/cgf.145781,2,3,6,7,8,9
+[10] R.Li,M.Tancik,andA.Kanazawa.NerfAcc:AGeneralNeRFAccelera- [31] Q.Wu,D.Bauer,Y.Chen,andK.-L.Ma.Hyperinr:Afastandpredictive
+tionToolbox,2022.doi:10.48550/ARXIV.2210.048476 hypernetworkforimplicitneuralrepresentationsviaknowledgedistillation,
+[11] Y.Li,E.Perlman,M.Wan,Y.Yang,C.Meneveau,R.Burns,S.Chen, 2023.3,9
+A.Szalay,andG.Eyink.Apublicturbulencedatabaseclusterandapplica- [32] Q.Wu,D.Bauer,M.J.Doyle,andK.-L.Ma. Instantneuralrepresenta-
+tionstostudyLagrangianevolutionofvelocityincrementsinturbulence. tionforinteractivevolumerendering,2022.doi:10.48550/ARXIV.2207.
+JournalofTurbulence,9,2008.7 116201,2,3,5,9
+[12] X.Liang,S.Di,D.Tao,S.Li,S.Li,H.Guo,Z.Chen,andF.Cappello. [33] A.Yu,R.Li,M.Tancik,H.Li,R.Ng,andA.Kanazawa.PlenOctreesfor
+Error-controlledlossycompressionoptimizedforhighcompressionratios real-timerenderingofneuralradiancefields.InICCV,2021.1,2,3
+ofscientificdatasets.In2018IEEEInternationalConferenceonBigData [34] K.Zhao, S.Di, M.Dmitriev, T.-L.D.Tonellot, Z.Chen, andF.Cap-
+(BigData),pp.438–447,2018.doi:10.1109/BigData.2018.86225208 pello. Optimizingerror-boundedlossycompressionforscientificdata
+[13] X.Liang, K.Zhao, S.Di, S.Li, R.Underwood, A.M.Gok, J.Tian, bydynamicsplineinterpolation. In2021IEEE37thInternationalCon-
+J. Deng, J. C. Calhoun, D. Tao, Z. Chen, and F. Cappello. SZ3: A ference on Data Engineering (ICDE), pp. 1643–1654, 2021. doi: 10.
+ModularFrameworkforComposingPrediction-BasedError-Bounded 1109/ICDE51399.2021.001458
+LossyCompressors.IEEETransactionsonBigData,9(2):485–498,2023. [35] ZhouWang,A.C.Bovik,H.R.Sheikh,andE.P.Simoncelli. Image
+doi:10.1109/TBDATA.2022.32011768 qualityassessment: fromerrorvisibilitytostructuralsimilarity. IEEE
+[14] D.B.Lindell,J.N.P.Martel,andG.Wetzstein. AutoInt: Automatic TransactionsonImageProcessing,13(4):600–612,2004.8
+IntegrationforFastNeuralVolumeRendering.InProc.CVPR,2021.2
+[15] L.Liu,J.Gu,K.Z.Lin,T.-S.Chua,andC.Theobalt.Neuralsparsevoxel
+fields.NeurIPS,2020.1,2,3
+[16] Y.Lu,K.Jiang,J.A.Levine,andM.Berger.Compressiveneuralrepresen-
+tationsofvolumetricscalarfields.ComputerGraphicsForum,40(3):135–
+146,2021.doi:10.1111/cgf.142951,2,8
+[17] J.N.P.Martel,D.B.Lindell,C.Z.Lin,E.R.Chan,M.Monteiro,and
+G.Wetzstein. Acorn:AdaptiveCoordinateNetworksforNeuralScene
+Representation.ACMTrans.Graph.,40(4),2021.doi:10.1145/3450626.
+34597851,2,3
+[18] B.Mildenhall,P.P.Srinivasan,M.Tancik,J.T.Barron,R.Ramamoorthi,
+andR.Ng. NeRF:RepresentingScenesasNeuralRadianceFieldsfor
+ViewSynthesis.InProc.EuropeanConferenceonComputerVision,2020.
+1,2

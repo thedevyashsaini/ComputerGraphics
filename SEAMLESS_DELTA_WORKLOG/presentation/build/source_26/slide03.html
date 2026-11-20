@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Preliminaries&nbsp;&nbsp;03</div><h1>Implicit neural representations</h1><div class="body">
+<div class="col" style="flex:1.2"><ul class="pts"><li>A neural network f<sub>&theta;</sub>(x, y, z) learns to reproduce the scalar value at any coordinate</li><li>The weights become the compressed file, so storage depends on model size and not on resolution</li><li>Random access comes for free: a renderer can query any point without decompressing the volume</li><li>Training uses random point batches with an L2 loss against the trilinear ground truth</li></ul></div>
+<div class="col" style="flex:1">
+ <div class="glass tint mathbox"><div class="label">OBJECTIVE</div>
+  <div class="math">min<sub>&theta;</sub> &nbsp;E<sub>x</sub> [ (f<sub>&theta;</sub>(x) &minus; v(x))<sup>2</sup> ]</div></div>
+ <div class="row">
+  <div class="glass stat"><div class="big">32<span style="font-size:40px"> MiB</span></div><div class="lab">Plume raw float32 volume, 512 &times; 128 &times; 128</div></div>
+  <div class="glass stat"><div class="big">3.5<span style="font-size:40px"> MiB</span></div><div class="lab">Our 8-brick model, 923k parameters, about 9&times; smaller</div></div>
+ </div>
+</div></div></div><div class="foot"><span class="sec">Preliminaries</span><span>Seamless APMGSRN</span><span>03 / 26</span></div></div></body></html>

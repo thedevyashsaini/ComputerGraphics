@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Results&nbsp;&nbsp;23</div><h1>Costs and tradeoffs</h1><div class="body">
+<div class="stack"><div class="glass fig" style="flex:none"><img src="../assets/tradeoffs.png" style="max-height:290px"></div><div class="row" style="flex:1;align-items:stretch"><div class="glass tcard" style="flex:1.35;padding:10px 18px"><table class="t" style="font-size:23px">
+ <tr><th>Cost</th><th>Hard</th><th>Blend</th></tr>
+ <tr><td style="padding:9px 14px">Query rate</td><td style="padding:9px 14px">11.5 to 12.2 Mpts/s</td><td style="padding:9px 14px">8.7 to 9.6</td></tr>
+ <tr><td style="padding:9px 14px">Frame time</td><td style="padding:9px 14px">3.5 to 4.3 s</td><td style="padding:9px 14px">same range</td></tr>
+ <tr><td style="padding:9px 14px">Peak GPU memory</td><td style="padding:9px 14px">0.181 GB</td><td style="padding:9px 14px">0.182 GB</td></tr>
+ <tr><td style="padding:9px 14px">Parameters</td><td style="padding:9px 14px">923k</td><td style="padding:9px 14px">923k</td></tr>
+ <tr><td style="padding:9px 14px">Extra training</td><td style="padding:9px 14px">0 min</td><td style="padding:9px 14px">4 to 7 min</td></tr>
+</table></div><div class="glass tint mathbox" style="flex:1;display:flex;flex-direction:column;justify-content:center"><div class="label">BOTTOM LINE</div><div class="note">About 22% slower point queries, since overlap points evaluate 2 to 8 bricks. Frame time shows no consistent penalty. Blending itself adds no parameters and no training.</div></div></div></div></div></div><div class="foot"><span class="sec">Results</span><span>Seamless APMGSRN</span><span>23 / 26</span></div></div></body></html>

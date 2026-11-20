@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Results&nbsp;&nbsp;22</div><h1>Ablation: what actually helps</h1><div class="body">
+<div class="col" style="flex:1"><ul class="pts sm"><li>Blending alone, with zero training, gives +1.24 dB in the boundary band and 463&times; lower jumps</li><li>A short decoder fine-tune on top adds the rest of the gain</li><li>The recon-only fine-tune control beats the consistency loss by 0.21 dB global and 0.38 dB boundary</li><li>The consistency loss lowers brick disagreement by only about 3.5% compared with the control</li></ul></div>
+<div class="col" style="flex:1">
+ <div class="glass tint mathbox"><div class="label">HONEST TAKEAWAY</div>
+  <div style="font-size:34px;line-height:1.4;font-weight:600;color:#12301b;margin-top:8px">The contribution comes from <span class="hl">blending plus a narrow overlap</span> plus a short decoder fine-tune. The consistency loss stays as a documented ablation.</div></div>
+ <div class="glass mathbox"><div class="note">Our reading: once blending forces continuity, the decoders gain more from fitting data than from agreeing with each other. Control results cover 2 seeds.</div></div>
+</div></div></div><div class="foot"><span class="sec">Results</span><span>Seamless APMGSRN</span><span>22 / 26</span></div></div></body></html>

@@ -1,0 +1,22 @@
+[
+  ["train.py", {
+    "save_name": "smoke_plume_dd",
+    "model": "APMGSRN",
+    "ensemble": true,
+    "ensemble_grid": "2,2,2",
+    "ensemble_ghost_cells": 3,
+    "data": "Plume.nc",
+    "n_features": 1,
+    "n_grids": 4,
+    "feature_grid_shape": "8,8,8",
+    "n_layers": 2,
+    "nodes_per_layer": 32,
+    "precondition": false,
+    "use_tcnn_if_available": false,
+    "log_every": 0,
+    "log_features_every": 0,
+    "lr": 0.01,
+    "points_per_iteration": 4096,
+    "iterations": 60
+  }]
+]

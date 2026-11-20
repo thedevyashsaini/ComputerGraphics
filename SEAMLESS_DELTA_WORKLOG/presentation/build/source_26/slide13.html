@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Implementation&nbsp;&nbsp;13</div><h1>Interface-consistency fine-tune</h1><div class="body">
+<div class="col" style="flex:1.2">
+ <div class="glass tint mathbox"><div class="label">LOSS</div>
+  <div class="math" style="font-size:28px">L = L<sub>rec</sub> + r(t) &middot; [ &lambda;<sub>v</sub> |f<sub>i</sub> &minus; f<sub>j</sub>|<sup>2</sup> + &lambda;<sub>g</sub> |&part;<sub>n</sub>f<sub>i</sub> &minus; &part;<sub>n</sub>f<sub>j</sub>|<sup>2</sup> ] / range<sup>2</sup></div>
+  <div class="note">f<sub>i</sub>, f<sub>j</sub>: neighbouring bricks at the same interface point. r(t): linear warmup over 250 steps. L<sub>rec</sub> on 2,048 anchor points keeps each brick faithful to its data.</div></div>
+ <div class="glass mathbox"><div class="label">WHAT WE TRAIN</div><div class="note">Only the decoders, about 37k parameters or 4% of the model. Grids and transforms stay frozen.</div></div>
+</div>
+<div class="col" style="flex:1"><div class="glass tcard"><table class="t">
+ <tr><th>Setting</th><th>Value</th></tr>
+ <tr><td>Iterations</td><td>1,500</td></tr>
+ <tr><td>Interface points / step</td><td>4,096</td></tr>
+ <tr><td>Anchor points / step</td><td>2,048</td></tr>
+ <tr><td>Learning rate</td><td>5e-4</td></tr>
+ <tr><td>&lambda;<sub>v</sub> / &lambda;<sub>g</sub></td><td>1 / 0.05</td></tr>
+ <tr><td>Warmup</td><td>250 steps</td></tr>
+ <tr><td>Extra time</td><td>4 to 7 min</td></tr>
+</table></div></div></div></div><div class="foot"><span class="sec">Implementation</span><span>Seamless APMGSRN</span><span>13 / 26</span></div></div></body></html>

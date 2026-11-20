@@ -1,0 +1,214 @@
+SEAMLESS APMGSRN - EXACT SLIDE-BY-SLIDE SPEAK-OUT
+Target duration: about 28 to 30 minutes
+
+The slide labels below are navigation aids. Speak the paragraphs under each label. Text inside square brackets is a delivery cue and should not be spoken.
+
+SLIDE 1 - SEAMLESS APMGSRN
+
+Good morning. We are Devyash Saini, Deepanshu, and Himanshu. Our project is called Seamless APMGSRN. It extends the paper Adaptively Placed Multi-Grid Scene Representation Networks for Large-Scale Data Visualization by Wurster and colleagues.
+
+The paper compresses scientific volumes using neural networks and scales to large data by splitting a volume into independently trained bricks. Our work focuses on one visual problem created by that decomposition: neighboring bricks can disagree at their shared boundary, which produces visible seams. We replace the hard switch between bricks with smooth overlap blending, and we test whether four ghost cells can achieve the quality of the paper's sixteen-cell solution. The image on the right is the Plume dataset rendered using our evaluation renderer.
+
+SLIDE 2 - SCIENTIFIC VOLUMES AND VOLUME RENDERING
+
+A scientific volume is a three-dimensional grid of scalar measurements. A voxel may store density, temperature, velocity magnitude, or another simulated quantity. Trilinear interpolation lets us treat the discrete voxels as a continuous scalar field that can be queried between grid points.
+
+To render the field, a transfer function converts each scalar value into color and opacity. A ray is marched through the volume, and the samples are composited from front to back. In the equation, alpha is the opacity contributed at a sample, c is its color, and T is the light that has survived all earlier samples.
+
+This matters because a small numerical discontinuity can become a strong visual line after transfer-function mapping and compositing. Our project therefore evaluates both data-space accuracy and rendered images.
+
+SLIDE 3 - IMPLICIT NEURAL REPRESENTATIONS
+
+Instead of storing every voxel, an implicit neural representation stores a function. The network takes an x, y, z coordinate and predicts the scalar value at that point. Training minimizes the squared error between the prediction and the trilinearly interpolated ground truth.
+
+After training, the network weights become the compressed representation. The original Plume volume has 512 by 128 by 128 float values and occupies 32 mebibytes. Our complete eight-brick model contains 923,136 parameters and occupies about 3.52 mebibytes in float32, so it is roughly nine times smaller. The network can also be sampled at arbitrary coordinates without first decompressing a complete voxel array.
+
+SLIDE 4 - FEATURE-GRID ENCODERS
+
+A plain multilayer perceptron can represent a volume, but it learns fine spatial detail slowly. Modern methods therefore store trainable feature vectors in spatial grids. At a query point, the grid features are interpolated and a small decoder converts those features into the scalar value.
+
+This figure compares three approaches. fVSRN uses a dense feature grid. NGP uses multiresolution hash grids. APMGSRN uses several smaller feature grids whose positions and shapes are learned. The important distinction is that APMGSRN can move model capacity toward difficult regions instead of distributing all features uniformly.
+
+SLIDE 5 - APMGSRN: ADAPTIVELY PLACED GRIDS
+
+APMGSRN contains multiple feature grids. Each grid has a learned affine transformation that maps a global coordinate into that grid's local coordinate system. If the point lies inside a grid, the model trilinearly interpolates its features. The features from all grids are concatenated and decoded by a small two-layer, sixty-four-neuron MLP.
+
+The paper introduces a differentiable feature-density loss to move grids toward regions with high reconstruction error. A flat-top Gaussian approximates the box-shaped support of each grid, so transformation parameters receive gradients even for difficult points outside the current grid boundary. The paper uses separate optimization for feature values and decoder weights versus grid transformations. Grid movement starts after an initial delay and stops early, allowing the final network to refine with fixed grid positions.
+
+SLIDE 6 - DOMAIN DECOMPOSITION AND GHOST CELLS
+
+One model may be too large or too slow for a very large scientific volume. The paper therefore partitions the volume into a grid of bricks and trains one APMGSRN for each brick. In our experiment, a two by two by two decomposition gives eight independently trained models.
+
+Each brick is enlarged by ghost cells, so adjacent models learn an overlapping region. However, the original inference rule is still a hard router. It computes the brick index from the coordinate and selects exactly one model. In this one-dimensional diagram, both models know the striped overlap, but the prediction changes from model A to model B at the dashed router split. This hard change is the source of the seam problem.
+
+SLIDE 7 - QUALITY METRICS USED IN THIS WORK
+
+Global PSNR measures reconstruction error across the complete volume. It can hide a seam because boundary voxels form only a small fraction of the data, so we also compute PSNR within a two-cell band around every internal split and PSNR in the remaining interior.
+
+We measure value jump as the normalized absolute change in the routed field across an interface. We measure gradient jump using the change in the normal derivative across that interface. A low value jump corresponds to continuity. A low gradient jump indicates smoother shading and closer first-derivative agreement.
+
+For rendered images, we report PSNR and SSIM using the same camera, transfer function, sample locations, and raw-volume reference. Finally, we measure query throughput, frame time, parameters, and peak GPU memory.
+
+SLIDE 8 - SEAMS AT BRICK BOUNDARIES
+
+This figure comes directly from the paper. With one ghost cell, a seam is visible even though the reported PSNR is 41.59 decibels. With sixteen ghost cells, the seam is much less visible, but PSNR falls to 40.56 decibels.
+
+The reason is a capacity trade-off. A wider overlap makes each fixed-size network learn more redundant voxels. The paper states that changing a 256-cubed brick to a 288-cubed training region increases the learned volume by about forty-two percent. The authors therefore recommend few ghost cells for general rendering and sixteen for seam-sensitive tasks such as isosurface extraction. They also identify communication between neighboring networks as future work. That is the opening our extension addresses.
+
+SLIDE 9 - PROBLEM STATEMENT
+
+Our target was to match or beat the seam quality of the paper's sixteen-ghost-cell approach while using only two to four ghost cells. The main comparison uses four cells because that gives enough width for a smooth transition.
+
+We required the comparison to keep the same model architecture and parameter count. We also retained the original hard router as an unchanged baseline. The scope was deliberately small enough for an RTX 3050 laptop with four gigabytes of memory: the Plume dataset, a two by two by two decomposition, and roughly two GPU-hours in total. Success meant near-zero value jumps, higher boundary PSNR, good rendered quality, and acceptable overhead.
+
+SLIDE 10 - REPRODUCING THE BASE PAPER
+
+We first cloned the authors' repository and reproduced the base APMGSRN training flow locally on Plume. We adapted the environment for Windows and for a four-gigabyte GPU. The original high-performance rendering dependencies, nerfacc and Tiny CUDA Neural Networks, could not be built reliably in this environment, so we used the PyTorch implementations for training and wrote a fixed-step PyTorch ray marcher for fair rendering comparisons.
+
+We verified the important qualitative behavior: adaptive grids migrate toward detailed regions, and wide ghost-cell overlap reduces visible seams while consuming capacity. This gave us a working baseline before adding the extension.
+
+SLIDE 11 - OUR DELTA IN THREE PARTS
+
+Our extension has three parts. First, partition-of-unity blending replaces the hard switch inside the existing overlap with smooth weights. This can be applied to a trained checkpoint without retraining or adding parameters.
+
+Second, we implemented a short decoder-only fine-tune. The intended consistency loss encourages neighboring models to predict the same value and normal gradient in their overlap. We later added a reconstruction-only control to determine whether consistency itself caused the gain.
+
+Third, we built a seam-aware evaluation suite. It measures boundary PSNR, value and gradient jumps, render PSNR and SSIM, speed, memory, and paired results across seeds. This evaluation is important because global PSNR alone does not describe a visible boundary artifact.
+
+SLIDE 12 - PARTITION-OF-UNITY BLENDING
+
+For each brick and each coordinate axis, we define a support interval from the ghost-cell training extent and a core interval where that brick should have weight one. Between the support edge and the core edge, the weight follows smoothstep, S of t equals three t squared minus two t cubed, clamped between zero and one.
+
+The three-dimensional brick weight is the product of the weights along x, y, and z. We evaluate every brick with nonzero support and compute the normalized weighted sum shown here.
+
+The key identity is S of t plus S of one minus t equals one. Neighboring ramps traverse the same overlap in opposite directions, so their weights form an exact partition of unity centered on the old hard split. Smoothstep also has zero slope at both ends. Faces combine two bricks, edges combine four, and corners combine eight. Outside an overlap, the result reduces exactly to the single owning brick.
+
+SLIDE 13 - INTERFACE-CONSISTENCY FINE-TUNE
+
+The fine-tune copies the checkpoint and freezes all adaptive feature grids and transformations. Only the small decoder MLPs are trainable, which is about thirty-seven thousand parameters, or about four percent of the complete model.
+
+The reconstruction term fits sampled ground-truth values in the overlap and at interior anchor points. The value-consistency term penalizes the squared difference between adjacent decoders at the same overlap point. The optional gradient term penalizes the difference between their normal derivatives. Both consistency terms are normalized by the squared data range and gradually enabled over a 250-step warm-up.
+
+Our scheduled setting used 1,500 iterations, 4,096 overlap samples per adjacent pair, 2,048 anchor samples per brick, a learning rate of five times ten to the minus four, value weight one, and gradient weight 0.05. The fine-tune took a few minutes.
+
+SLIDE 14 - CODE AND EVALUATION PIPELINE
+
+We implemented blending as a new inference mode around the existing ensemble. The original hard-routing function remains unchanged, and a unit test verifies bit-for-bit equivalence with the previous calculation.
+
+The geometry utilities explicitly handle the repository's DHW storage order and the model's XYZ coordinate order. Tests verify the overlap extents, partition of unity, smooth endpoints, active model counts at faces, edges, and corners, finite gradients, and agreement between optimized and full blending paths. There are nineteen CPU unit tests in total.
+
+The pipeline trains or loads checkpoints, fine-tunes selected variants, reconstructs the complete volume, samples every interface, renders fixed views, benchmarks throughput, and writes JSON, CSV, tables, and plots.
+
+SLIDE 15 - FULL VIEW: BOUNDARY SLICE ERROR
+
+[Pause briefly and point to the three panels.]
+
+This is a central slice through Plume. The first panel is ground truth, the second is the g4 hard-routed reconstruction, and the third is absolute error. The straight error lines align with the decomposition splits. This shows why a global average can look strong while a structured boundary artifact remains visible.
+
+SLIDE 16 - EXPERIMENTAL SETUP
+
+The dataset is Plume at 512 by 128 by 128. We use a two by two by two decomposition. Every main-condition brick uses eight feature grids of resolution twenty-four cubed, one feature per grid vertex, and a two-layer decoder with sixty-four neurons per layer.
+
+All twenty-four-cubed conditions have exactly 923,136 total parameters, so the g4 and g16 comparison changes overlap and routing, not model size. Each brick trains for 5,000 iterations with 32,768 sampled points per iteration. The main g4 and g16 conditions use seeds 42, 1, and 2.
+
+We also trained larger g16 models with twenty-seven-cubed and thirty-two-cubed grids to test whether the paper setting could catch up by receiving more capacity. The complete study used about two hours and ten minutes of GPU time.
+
+SLIDE 17 - HEADLINE RESULT AGAINST THE PAPER SETTING
+
+At equal model size, our four-cell consistency-fine-tuned and blended variant beats the paper-style sixteen-cell hard router by 2.00 decibels in global PSNR and 2.51 decibels in boundary PSNR. Its routed value jump is 579 times smaller. It adds zero parameters.
+
+These are paired same-seed differences over seeds 42, 1, and 2, and our method wins on every listed metric for every seed. The render PSNR gain is 2.08 decibels. This supports the central claim: a narrow overlap with blending can preserve more useful capacity and remove the seam more effectively than a wide overlap with hard routing.
+
+SLIDE 18 - FULL VIEW: HEADLINE COMPARISON
+
+The red bars are the paper-style g16 hard router. The green bars are our blended variants. The first panels show that narrow-overlap blending improves global, boundary, and rendered accuracy. The logarithmic value-jump panel shows the largest change: hard-routed methods remain around ten to the minus three, while blended methods are near six times ten to the minus six.
+
+The individual points are seeds, and the bars summarize their means. The thirty-two-cubed g16 model receives 2.3 times more parameters and finally approaches our global PSNR, but its seam jump remains hundreds of times larger.
+
+SLIDE 19 - MAIN RESULTS ON PLUME
+
+This table contains the complete mean results. The red-marked row is g16 hard at the same 0.92-million parameter size. The green rows are the blended fine-tuned variants.
+
+Blending alone raises g4 boundary PSNR from 46.56 to 47.80 decibels and reduces the value jump from 2.69 times ten to the minus three to 5.81 times ten to the minus six. The consistency-fine-tuned blended model reaches 50.66 global and 48.00 boundary PSNR. The reconstruction-only fine-tune plus blending is the best measured variant at 50.98 global and 48.43 boundary PSNR.
+
+All main twenty-four-cubed rows contain the same number of parameters. Throughput is the median from seven interleaved benchmark rounds rather than a single noisy timing.
+
+SLIDE 20 - PAIRED COMPARISONS ACROSS SEEDS
+
+This table subtracts baselines from matched-seed results. Against g16 hard, blending alone already gives a 1.69-decibel global gain, a 2.32-decibel boundary gain, and a 567-times reduction in value jump. Adding the scheduled fine-tune increases the global gain to 2.00 decibels.
+
+Against g4 hard, our method gains 0.51 global, 1.44 boundary, and 1.10 render decibels, with a 474-times smaller value jump. Giving g16 the same extra reconstruction fine-tuning does not close the gap.
+
+The last row is the important negative control. Consistency fine-tuning loses slightly to reconstruction-only fine-tuning on both tested seeds. Therefore, we do not claim that the consistency loss is the main source of the accuracy gain. The defensible contribution is narrow-overlap blending plus a short decoder fine-tune, with consistency retained as an ablation.
+
+SLIDE 21 - RENDERED IMAGES, SEED 42
+
+Each pair shows a rendered image and its error against the raw-volume reference amplified eight times. The g16 hard render scores 40.97 decibels and SSIM 0.9876. The g4 hard model improves to 42.63 decibels. Our g4 reconstruction-fine-tuned blended result reaches 43.44 decibels and SSIM 0.9922.
+
+The amplified g16 error contains a vertical streak aligned with a brick boundary. That structured streak disappears in the blended result. These images were all produced by our own renderer with identical settings, so they compare our variants fairly, but they should not be compared numerically with rendering values from a different renderer.
+
+SLIDE 22 - HOW MUCH CAPACITY DOES G16 NEED TO CATCH UP
+
+We next increased only the g16 feature-grid resolution. At twenty-four cubed, g16 uses 0.92 million parameters and trails our method by about two decibels. At twenty-seven cubed it uses 1.30 million parameters and still trails. At thirty-two cubed it uses 2.14 million parameters, about 2.3 times our parameter count, and reaches 50.62 decibels compared with our 50.66.
+
+Even at that size, our boundary PSNR is 0.40 decibels higher and our value jump is 444 times smaller. The larger g16 model does slightly beat the consistency variant on render PSNR, 43.57 versus 43.33, while our reconstruction-fine-tuned blend reaches 43.58. The capacity sweep is single-seed, so we present it as indicative rather than statistically complete.
+
+SLIDE 23 - FULL VIEW: CAPACITY COMPARISON
+
+The x-axis is total parameter count across all eight bricks. The red line shows g16 receiving larger feature grids. The green points are our fixed 0.92-million parameter variants. The left panel shows the 2.3-times parameter requirement for g16 to match global PSNR. The right panel shows that boundary accuracy still favors the narrow blended method.
+
+SLIDE 24 - EFFECT OF OVERLAP WIDTH
+
+With hard routing and equal model size, global PSNR decreases as overlap grows: 50.92 for g1, 50.16 for g4, and 48.66 for g16. A fixed-size brick model must spend more of its capacity on redundant overlap voxels.
+
+Boundary PSNR follows the same trade-off for hard routing, while the value-jump panel shows that hard routing never removes the discontinuity reliably. At g4, blending makes the routed field continuous and reduces the jump to the numerical floor. This means a wide overlap no longer provides enough benefit to justify its capacity cost.
+
+SLIDE 25 - FULL VIEW: OVERLAP-WIDTH COMPARISON
+
+This enlarged view shows the three metrics together. The grey hard-routing curve falls as overlap increases. The blue blend and green fine-tuned blend preserve the stronger g4 accuracy. In the logarithmic jump panel, the blended g4 points are several orders of magnitude below all hard-routed points.
+
+We did not complete the g2 condition within the GPU budget. g1 is also only a single seed. Those are limitations rather than hidden results.
+
+SLIDE 26 - ABLATION: WHAT ACTUALLY HELPS
+
+The strongest finding from the ablation is that blending does most of the seam removal without training. It improves g4 boundary PSNR by 1.24 decibels and reduces the routed value jump by 463 times.
+
+A short decoder fine-tune adds accuracy, but the reconstruction-only control beats the explicit consistency loss by 0.21 decibels globally and 0.38 decibels at the boundary over the two available seeds. The consistency loss reduces pairwise disagreement only slightly once blending is active.
+
+Our honest interpretation is that blending enforces continuity at inference, while the extra decoder steps improve data fitting. Therefore, our final method recommendation is a narrow ghost-cell overlap, partition-of-unity blending, and a short decoder fine-tune. The interface-consistency loss is reported as an explored idea and negative ablation.
+
+SLIDE 27 - COSTS AND TRADE-OFFS
+
+Blending evaluates multiple bricks for points inside face, edge, or corner overlaps. In a fair benchmark, hard routing achieves about 11.5 to 12.2 million points per second and blending achieves 8.7 to 9.6 million, so the query-level overhead is about twenty-two percent.
+
+Peak evaluation memory is effectively unchanged at about 0.18 gigabytes, and the parameter count remains 923 thousand. In our complete renderer, frame times remain in the same 3.5 to 4.3 second range without a consistent blend penalty. Blending itself requires no training. The optional decoder fine-tune adds roughly four to seven minutes depending on the run.
+
+SLIDE 28 - FULL VIEW: PERFORMANCE TRADE-OFFS
+
+The left graph compares reconstruction accuracy with storage. The middle graph compares accuracy with query throughput. The right graph compares accuracy with seam discontinuity on a logarithmic axis.
+
+Our method moves strongly toward the low-discontinuity side while retaining high accuracy and the same storage. Its cost is lower raw query throughput. A fused CUDA implementation that groups active bricks could reduce this overhead, because our current blend is written in general PyTorch.
+
+SLIDE 29 - PLANNED EXTENSIONS
+
+The first extension is testing g2 to find the narrowest overlap that still gives a stable smooth ramp. We would also add seeds to the single-seed capacity results and evaluate a second dataset such as Supernova or Nyx.
+
+On the method side, the blend width could vary by interface according to local error. On the engineering side, a fused CUDA blend kernel could recover query speed, and the blend could be integrated into the paper's nerfacc and Tiny CUDA Neural Networks renderer. Visual extensions include crack-free isosurfaces. A larger decomposition, such as four by four by four, would test scaling to many bricks and multiple GPUs.
+
+SLIDE 30 - LIMITATIONS
+
+Our main evaluation uses one dataset and one two by two by two decomposition. The key g4 and g16 equal-size conditions have three seeds, but g1, the larger g16 capacity runs, and some controls have only one or two seeds.
+
+Our renderer is a PyTorch reference renderer rather than the paper's optimized renderer. Blending reduces raw point-query speed by about twenty-two percent in our implementation. Value continuity is essentially solved, but gradient jump improves by only 1.38 times. Our measured gradient jump is 2.12 times ten to the minus three, while the ground-truth change at the same interfaces is 1.75 times ten to the minus three, so some of the remainder reflects real field variation and model gradient noise.
+
+These limitations bound the claim: the result is strong for Plume at equal model size, but broader generalization still needs more datasets and decompositions.
+
+SLIDE 31 - SUMMARY AND Q AND A
+
+To summarize, the seam originates from a hard switch between independently trained brick models. Smoothstep partition-of-unity blending replaces that switch with a continuous weighted field and requires no new parameters or retraining.
+
+On Plume, four ghost cells plus blending and a short decoder fine-tune beat the equal-size sixteen-cell paper setting by about two decibels globally, two and a half decibels at the boundary, and roughly 579 times in value-jump reduction over three matched seeds. The cost is about twenty-two percent slower raw point queries and a few optional fine-tuning minutes.
+
+The reconstruction-only control taught us that the consistency loss is not the source of the main gain. The core contribution is the blend, the narrow overlap, the evaluation framework, and the evidence that wide ghost-cell redundancy can be avoided.
+
+Thank you. We are ready for questions.

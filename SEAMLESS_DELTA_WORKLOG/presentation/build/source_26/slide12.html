@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Implementation&nbsp;&nbsp;12</div><h1>Partition-of-unity blending</h1><div class="body">
+<div class="col" style="flex:1.15">
+ <div class="glass tint mathbox"><div class="label">PER-AXIS WEIGHT OF BRICK i</div>
+  <div class="math" style="font-size:27px">w<sub>i</sub>(q) = S( (q &minus; s<sub>min</sub>) / (c<sub>min</sub> &minus; s<sub>min</sub>) ) &middot; S( (s<sub>max</sub> &minus; q) / (s<sub>max</sub> &minus; c<sub>max</sub>) )</div>
+  <div class="math" style="font-size:30px">S(t) = 3t<sup>2</sup> &minus; 2t<sup>3</sup> &nbsp;&nbsp; (clamped to [0, 1])</div></div>
+ <div class="glass tint mathbox"><div class="label">BLENDED FIELD</div>
+  <div class="math" style="font-size:34px">F(x) = &Sigma;<sub>i</sub> w<sub>i</sub>(x) f<sub>i</sub>(x) / &Sigma;<sub>i</sub> w<sub>i</sub>(x)</div>
+  <div class="note">3D weight = product of the three per-axis weights. s = support edge with ghost cells, c = core edge.</div></div>
+</div>
+<div class="col" style="flex:1"><ul class="pts sm"><li>S(t) + S(1 &minus; t) = 1, so the two ramps sum to one and centre on the old split</li><li>S has zero slope at both ends, so F stays C<sup>1</sup> across the overlap</li><li>Faces blend 2 bricks, edges 4, corners 8</li><li>Outside the overlap F equals the hard-routed model exactly</li><li>No training, no new parameters</li></ul></div></div></div><div class="foot"><span class="sec">Implementation</span><span>Seamless APMGSRN</span><span>12 / 26</span></div></div></body></html>

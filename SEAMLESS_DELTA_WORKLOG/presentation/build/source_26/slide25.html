@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Extensions&nbsp;&nbsp;25</div><h1>Limitations</h1><div class="body">
+<div class="col" style="flex:1"><ul class="pts sm"><li>One dataset and one decomposition, 2 &times; 2 &times; 2 on Plume</li><li>Some rows rely on one or two seeds: g1, g16 at 27<sup>3</sup> and 32<sup>3</sup>, and the recon controls</li><li>Renders come from our own PyTorch ray marcher, not the paper's nerfacc renderer</li><li>Blending makes queries about 22% slower in our PyTorch implementation</li><li>Gradient jumps drop only 1.38&times;, so the field stays continuous but normals still bend slightly</li></ul></div>
+<div class="col" style="flex:.85"><div class="glass tcard"><table class="t" style="font-size:26px">
+ <tr><th>Claim</th><th>Seeds</th><th>Strength</th></tr>
+ <tr class="ours"><td>Ours beats g16 hard</td><td>3</td><td>every seed</td></tr>
+ <tr><td>Blend beats g4 hard</td><td>3</td><td>every seed</td></tr>
+ <tr><td>Recon FT beats consistency</td><td>2</td><td>indicative</td></tr>
+ <tr><td>g16 needs 2.3&times; params</td><td>1</td><td>indicative</td></tr>
+</table></div></div></div></div><div class="foot"><span class="sec">Extensions</span><span>Seamless APMGSRN</span><span>25 / 26</span></div></div></body></html>

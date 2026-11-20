@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body><div class="slide"><div class="grid-tex"></div><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="frame"><div class="kicker"><i></i>Preliminaries&nbsp;&nbsp;02</div><h1>Scientific volumes and <span class=hl>volume rendering</span></h1><div class="body">
+<div class="col" style="flex:1.15"><ul class="pts"><li>A scientific volume stores one scalar per voxel, for example density, temperature or vorticity, on a regular 3D grid</li><li>Trilinear interpolation turns the voxel grid into a continuous field v(x) that we can query at any point</li><li>A transfer function maps each scalar to a colour and an opacity, which decides what the viewer actually sees</li><li>Direct volume rendering marches rays through the field and composites samples front to back</li></ul></div>
+<div class="col" style="flex:1">
+ <div class="glass tint mathbox"><div class="label">FRONT-TO-BACK COMPOSITING</div>
+  <div class="math">C = &Sigma;<sub>i</sub> T<sub>i</sub> &alpha;<sub>i</sub> c<sub>i</sub></div>
+  <div class="math">T<sub>i</sub> = &Pi;<sub>j&lt;i</sub> (1 &minus; &alpha;<sub>j</sub>)</div>
+  <div class="note">c<sub>i</sub> and &alpha;<sub>i</sub> come from the transfer function at sample i. T<sub>i</sub> is the light that survives up to that sample.</div>
+ </div>
+ <div class="glass mathbox"><div class="label">WHY IT MATTERS HERE</div>
+  <div class="note">Every pixel integrates hundreds of samples along a ray. A small jump in the field becomes a visible line in the image, because the transfer function amplifies sharp value changes.</div>
+ </div>
+</div></div></div><div class="foot"><span class="sec">Preliminaries</span><span>Seamless APMGSRN</span><span>02 / 26</span></div></div></body></html>
